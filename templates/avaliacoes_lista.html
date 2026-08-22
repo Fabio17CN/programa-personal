@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Avaliações Físicas{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar"><h2>Avaliações Físicas</h2></div>
+  <div class="section-title">{{ total }} avaliação(ões) registrada(s)</div>
+
+  {% if avaliacoes %}
+    {% for av in avaliacoes %}
+      <a href="{{ url_for('avaliacao_resultado', aluno_id=av.aluno_id, avaliacao_id=av.id) }}" class="item-lista-card">
+        <div>
+          <div class="titulo">{{ av.aluno_nome }}</div>
+          <div class="sub">
+            {{ av.data[:10] }}
+            {% if av.peso %} · {{ av.peso }} kg{% endif %}
+            {% if av.imc %} · IMC {{ "%.1f"|format(av.imc) }}{% if av.imc_class %} ({{ av.imc_class }}){% endif %}{% endif %}
+            {% if av.bf %} · {{ "%.1f"|format(av.bf) }}% gordura{% endif %}
+          </div>
+        </div>
+        <span class="arrow" style="color:var(--primary);">›</span>
+      </a>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state"><div class="empty-ic">📈</div><p>Nenhuma avaliação física registrada ainda.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

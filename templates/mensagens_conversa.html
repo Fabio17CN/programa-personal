@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Conversa — {{ aluno.nome }}{% endblock %}
+{% block content %}
+<div class="container chat-container">
+
+  <div class="chat-header">
+    <a href="{{ url_for('mensagens') }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <span class="chat-header-avatar">
+      {% if aluno.foto_perfil %}
+        <img src="{{ url_for('servir_foto', aluno_id=aluno.id, nome_arquivo=aluno.foto_perfil|basename) }}" alt="Foto de {{ aluno.nome }}">
+      {% else %}
+        {{ (aluno.nome or '?')[0]|upper }}
+      {% endif %}
+    </span>
+    <span class="chat-header-info">
+      <span class="chat-header-nome">{{ aluno.nome }}</span>
+      <span class="chat-header-sub">Aluno</span>
+    </span>
+  </div>
+
+  <div class="chat-messages" id="chatMessages" data-ultimo-id="{{ ultimo_id }}" data-ultimo-dia="{{ ultimo_dia }}">
+    {% set minha_chave = 'personal' %}    {% if not mensagens %}
+      <div class="chat-empty">
+        <div class="empty-ic">👋</div>
+        <p>Nenhuma mensagem ainda.<br>Envie a primeira mensagem para {{ aluno.nome.split(' ')[0] }}.</p>
+      </div>
+    {% endif %}
+    {% for item in mensagens %}
+      {% if item._kind == 'data' %}
+        <div class="chat-date-sep"><span>{{ item.label }}</span></div>
+      {% else %}
+        {% include "_chat_bolha.html" %}
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <div class="chat-gravando-bar" id="chatGravando" style="display:none;">
+    <span class="rec-dot"></span>
+    <span class="chat-video-preview-circle" id="recPreviewVideo" style="display:none;"><video id="recVideoEl" muted autoplay playsinline></video></span>
+    <span class="rec-timer" id="recTimer">0:00</span>
+    <span class="rec-label" id="recLabel">Gravando áudio…</span>
+    <button type="button" class="rec-cancelar" title="Cancelar" onclick="window.cancelarGravacao()">{{ svg('lixeira') }}</button>
+    <button type="button" class="rec-enviar" title="Enviar" onclick="window.confirmarGravacao()">{{ svg('check-solo') }}</button>
+  </div>
+
+  <form class="chat-input-bar" id="formChat" onsubmit="return enviarChat(event)">
+    <input type="hidden" id="csrfToken" value="{{ csrf_token() }}">
+    <input type="file" id="inputFoto" accept="image/*" style="display:none;" onchange="window.enviarFotoSelecionada(event)">
+    <button type="button" class="chat-btn-acessorio" id="btnAnexarFoto" title="Enviar foto" onclick="document.getElementById('inputFoto').click()">{{ svg('imagem') }}</button>
+    <textarea id="chatTexto" rows="1" placeholder="Digite uma mensagem..." onkeydown="teclaChat(event)" oninput="autoAltura(this); window.alternarBotoesEnvio();"></textarea>
+    <button type="button" class="chat-btn-acessorio" id="btnGravarAudio" title="Gravar áudio" onclick="window.iniciarGravacao('audio')">{{ svg('microfone') }}</button>
+    <button type="button" class="chat-btn-acessorio" id="btnGravarVideo" title="Vídeo instantâneo" onclick="window.iniciarGravacao('video')">{{ svg('camera-video') }}</button>
+    <button type="submit" class="chat-btn-enviar" id="btnEnviarTexto" title="Enviar" style="display:none;">{{ svg('enviar') }}</button>
+  </form>
+</div>
+
+<div class="midia-viewer-overlay" id="midiaViewer" onclick="if(event.target===this) window.fecharVisualizador()">
+  <button type="button" class="midia-viewer-fechar" onclick="window.fecharVisualizador()">{{ svg('fechar-x') }}</button>
+  <div class="midia-viewer-conteudo" id="midiaViewerConteudo"></div>
+</div>
+
+<!-- Menu de ação da mensagem: abre ao apertar e segurar (ou clique direito)
+     em cima de uma mensagem enviada por você — igual ao WhatsApp. -->
+<div class="modal-overlay" id="menuMensagemOverlay" onclick="if(event.target===this) window.fecharMenuMensagem()">
+  <div class="modal-janela modal-janela-msg" role="dialog" aria-modal="true">
+    <button type="button" class="menu-msg-opcao menu-msg-apagar" onclick="window.apagarMensagemSelecionada()">{{ svg('lixeira') }} Apagar para todos</button>
+    <button type="button" class="menu-msg-opcao menu-msg-cancelar" onclick="window.fecharMenuMensagem()">Cancelar</button>
+  </div>
+</div>
+
+<script>
+  const URL_ENVIAR = "{{ url_for('mensagens_conversa_enviar', aluno_id=aluno.id) }}";
+  const URL_ENVIAR_MIDIA = "{{ url_for('mensagens_conversa_enviar_midia', aluno_id=aluno.id) }}";
+  const URL_NOVAS_BASE = "{{ url_for('mensagens_conversa_novas', aluno_id=aluno.id) }}";
+  const URL_APAGAR = "{{ url_for('mensagens_conversa_apagar', aluno_id=aluno.id) }}";
+  const MINHA_CHAVE = 'personal';
+</script>
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+{% endblock %}

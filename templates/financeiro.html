@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Financeiro{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar"><h2>Financeiro</h2></div>
+
+  <div class="resumo-dia" style="margin-bottom:16px;">
+    <div class="resumo-dia-titulo">Este mês</div>
+    <div class="resumo-dia-grid" style="grid-template-columns:repeat(3,1fr);">
+      <div class="resumo-dia-item">
+        <div class="num" style="color:#34D399;">R$ {{ "%.2f"|format(resumo.receitas)|replace(".", ",") }}</div>
+        <div class="lbl">Receitas</div>
+      </div>
+      <div class="resumo-dia-item">
+        <div class="num" style="color:#F87171;">R$ {{ "%.2f"|format(resumo.despesas)|replace(".", ",") }}</div>
+        <div class="lbl">Despesas</div>
+      </div>
+      <div class="resumo-dia-item">
+        <div class="num">R$ {{ "%.2f"|format(resumo.saldo)|replace(".", ",") }}</div>
+        <div class="lbl">Saldo</div>
+      </div>
+    </div>
+  </div>
+
+  <details class="card-toggle">
+    <summary>Novo lançamento</summary>
+    <form method="post" action="{{ url_for('financeiro_novo') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Tipo</label>
+      <select name="tipo">
+        <option value="receita">Receita</option>
+        <option value="despesa">Despesa</option>
+      </select>
+      <div class="row">
+        <div><label>Valor (R$)</label><input type="text" name="valor" inputmode="decimal" placeholder="Ex: 150,00" required></div>
+        <div><label>Data</label><input type="date" name="data" value="{{ hoje }}"></div>
+      </div>
+      <label>Categoria</label>
+      <input type="text" name="categoria" placeholder="Ex: Mensalidade, Aluguel de sala, Equipamento...">
+      <label>Aluno relacionado (opcional)</label>
+      <select name="aluno_id">
+        <option value="">— Nenhum —</option>
+        {% for a in alunos %}<option value="{{ a.id }}">{{ a.nome }}</option>{% endfor %}
+      </select>
+      <label>Descrição</label>
+      <input type="text" name="descricao" placeholder="Detalhe do lançamento">
+      <button type="submit" class="btn btn-primary">SALVAR LANÇAMENTO</button>
+    </form>
+  </details>
+
+  <div class="abas-filtro">
+    <a href="{{ url_for('financeiro') }}" class="{{ 'ativa' if not filtro_tipo }}">Todos</a>
+    <a href="{{ url_for('financeiro', tipo='receita') }}" class="{{ 'ativa' if filtro_tipo == 'receita' }}">Receitas</a>
+    <a href="{{ url_for('financeiro', tipo='despesa') }}" class="{{ 'ativa' if filtro_tipo == 'despesa' }}">Despesas</a>
+  </div>
+
+  {% if lancamentos %}
+    {% for l in lancamentos %}
+      <div class="item-lista-card">
+        <div>
+          <div class="titulo">{{ l.categoria or (l.tipo|capitalize) }}</div>
+          <div class="sub">{{ l.data }}{% if l.descricao %} · {{ l.descricao }}{% endif %}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="valor {{ 'valor-receita' if l.tipo == 'receita' else 'valor-despesa' }}">
+            {{ '+' if l.tipo == 'receita' else '-' }} R$ {{ "%.2f"|format(l.valor)|replace(".", ",") }}
+          </span>
+          <form method="post" action="{{ url_for('financeiro_excluir', lancamento_id=l.id) }}" class="form-excluir-item"
+                onsubmit="return confirm('Excluir este lançamento?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-icon-excluir" title="Excluir">🗑️</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state"><div class="empty-ic">💲</div><p>Nenhum lançamento ainda. Registre a primeira receita ou despesa.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

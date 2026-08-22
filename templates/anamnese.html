@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Anamnese{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar"><h2>Anamnese — {{ aluno.nome }}</h2></div>
+
+  <div class="card" style="max-width:none;">
+
+    <div class="wizard-step active" id="passoModo" data-index="modo">
+      <div class="wizard-pergunta" style="font-size:15px;">
+        Como a anamnese vai ser preenchida?
+      </div>
+      <label class="check-enviar-aluno">
+        <input type="checkbox" id="chkEnviarAluno" onchange="alternarModo()">
+        <span>
+          <strong>Enviar Anamnese para o Aluno</strong>
+          <small>O aluno responde pelo próprio acesso, quando quiser. Você recebe um aviso assim que ele concluir.</small>
+        </span>
+      </label>
+      <p class="modo-explicacao" id="modoExplicacao">
+        Desmarcado: você preenche a anamnese agora, junto com {{ aluno.nome.split(' ')[0] }}.
+      </p>
+      <div class="wizard-nav" style="margin-top:22px;">
+        <button type="button" class="btn btn-primary" style="width:100%;" onclick="continuarModo()" id="btnContinuarModo">
+          Continuar
+        </button>
+      </div>
+    </div>
+
+    <div class="wizard-progress" id="progresso" style="display:none;">Pergunta 1 de {{ perguntas|length }}</div>
+
+    {% for p in perguntas %}
+    <div class="wizard-step" data-index="{{ loop.index0 }}">
+      <div class="wizard-pergunta">{{ p }}</div>
+      <div class="wizard-opcoes">
+        <button type="button" class="btn-sim" onclick="responder({{ loop.index0 }}, 'Sim', this)">SIM</button>
+        <button type="button" class="btn-nao" onclick="responder({{ loop.index0 }}, 'Não', this)">NÃO</button>
+      </div>
+      <button type="button" class="btn-toggle-obs" onclick="alternarObservacao({{ loop.index0 }})">📝 Adicionar observação sobre esta pergunta</button>
+      <textarea class="obs-pergunta" id="obs-{{ loop.index0 }}" style="display:none;"
+                placeholder="Ex.: aluno relatou dor no ombro direito há 2 semanas..."
+                oninput="salvarObservacao({{ loop.index0 }}, this.value)"></textarea>
+    </div>
+    {% endfor %}
+
+    <div class="wizard-nav" id="navQuestoes" style="display:none;">
+      <button type="button" class="btn btn-outline" id="btnVoltar" onclick="voltar()">Voltar</button>
+      <button type="button" class="btn btn-link" onclick="finalizar()">Pular anamnese</button>
+    </div>
+  </div>
+
+  <form method="post" id="formAnamnese" style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="modo" id="modoInput" value="preencher">
+    <input type="hidden" name="respostas_json" id="respostasJson">
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.btn-toggle-obs {
+  background: none; border: none; color: var(--primary); font-size: 12px; font-weight: 700;
+  margin-top: 14px; cursor: pointer; padding: 0;
+}
+.obs-pergunta { margin-top: 10px; }
+.check-enviar-aluno {
+  display: flex; align-items: flex-start; gap: 12px; cursor: pointer;
+  margin-top: 18px; padding: 14px; border-radius: 14px;
+  background: var(--card-2); border: 1px solid var(--border);
+}
+.check-enviar-aluno input[type=checkbox] {
+  width: 20px; height: 20px; margin-top: 2px; accent-color: var(--primary); flex-shrink: 0;
+}
+.check-enviar-aluno span { display: flex; flex-direction: column; gap: 3px; }
+.check-enviar-aluno strong { font-size: 13.5px; color: var(--text); }
+.check-enviar-aluno small { font-size: 11.5px; color: var(--subtext); line-height: 1.4; }
+.modo-explicacao { font-size: 11.5px; color: var(--subtext); margin-top: 10px; line-height: 1.4; }
+</style>
+<script>
+const total = {{ perguntas|length }};
+const perguntasTexto = {{ perguntas|tojson }};
+let atual = 0;
+let respostas = new Array(total).fill(null);
+let observacoes = new Array(total).fill('');
+
+function alternarModo() {
+  const marcado = document.getElementById('chkEnviarAluno').checked;
+  document.getElementById('modoExplicacao').textContent = marcado
+    ? 'Marcado: o preenchimento agora será pulado. O questionário fica liberado no acesso do aluno para ele responder quando puder.'
+    : "Desmarcado: você preenche a anamnese agora, junto com {{ aluno.nome.split(' ')[0] }}.";
+  document.getElementById('btnContinuarModo').textContent = marcado ? 'Enviar para o aluno' : 'Continuar';
+}
+
+function continuarModo() {
+  const marcado = document.getElementById('chkEnviarAluno').checked;
+  if (marcado) {
+    document.getElementById('modoInput').value = 'enviar_aluno';
+    document.getElementById('formAnamnese').submit();
+    return;
+  }
+  document.getElementById('modoInput').value = 'preencher';
+  document.getElementById('passoModo').classList.remove('active');
+  document.getElementById('progresso').style.display = '';
+  document.getElementById('navQuestoes').style.display = '';
+  mostrar(0);
+}
+
+function mostrar(i) {
+  document.querySelectorAll('.wizard-step[data-index]:not(#passoModo)').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.wizard-step[data-index="${i}"]`).classList.add('active');
+  document.getElementById('progresso').textContent = `Pergunta ${i + 1} de ${total}`;
+  document.getElementById('btnVoltar').style.visibility = i === 0 ? 'hidden' : 'visible';
+}
+
+function alternarObservacao(i) {
+  const ta = document.getElementById(`obs-${i}`);
+  ta.style.display = ta.style.display === 'none' ? 'block' : 'none';
+  if (ta.style.display === 'block') ta.focus();
+}
+
+function salvarObservacao(i, valor) {
+  observacoes[i] = valor;
+}
+
+function responder(i, valor, btn) {
+  respostas[i] = valor;
+  const step = btn.closest('.wizard-step');
+  step.querySelectorAll('.wizard-opcoes button').forEach(b => b.classList.remove('selecionado-sim', 'selecionado-nao'));
+  btn.classList.add(valor === 'Sim' ? 'selecionado-sim' : 'selecionado-nao');
+  setTimeout(() => {
+    if (i + 1 < total) { atual = i + 1; mostrar(atual); }
+    else finalizar();
+  }, 200);
+}
+
+function voltar() {
+  if (atual > 0) { atual -= 1; mostrar(atual); }
+}
+
+function finalizar() {
+  const payload = perguntasTexto.map((p, idx) => ({
+    pergunta: p,
+    resposta: respostas[idx] || 'Não respondido',
+    observacao: (observacoes[idx] || '').trim(),
+  }));
+  document.getElementById('modoInput').value = 'preencher';
+  document.getElementById('respostasJson').value = JSON.stringify(payload);
+  document.getElementById('formAnamnese').submit();
+}
+</script>
+{% endblock %}

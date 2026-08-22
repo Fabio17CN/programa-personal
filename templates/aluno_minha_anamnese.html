@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Minha Anamnese{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('aluno_area') }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>Minha Anamnese</h2>
+  </div>
+
+  {% if pendente %}
+    <a href="#" onclick="abrirModalAnamnese(event)" class="alerta-anamnese-pendente" style="margin-bottom:18px;">
+      <span class="alerta-anamnese-icone">📋</span>
+      <span class="alerta-anamnese-texto">
+        <strong>
+          {% if pendente.status == 'em_andamento' %}Você tem uma anamnese em andamento{% else %}Você tem uma anamnese pendente{% endif %}
+        </strong>
+        <small>Toque aqui para responder agora.</small>
+      </span>
+      <span class="alerta-anamnese-seta">›</span>
+    </a>
+  {% endif %}
+
+  {% if respondida %}
+    <div class="card" style="max-width:none;">
+      <p style="color:var(--subtext);font-size:12.5px;margin:0 0 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <span>Última anamnese respondida em {{ (respondida.data_resposta or respondida.data or '')[:10] }}</span>
+        <a href="#" onclick="abrirModalAnamnese(event)" style="color:var(--primary);font-weight:700;white-space:nowrap;">Editar</a>
+      </p>
+      {% if respostas %}
+        {% for r in respostas %}
+          <div class="item-lista-card" style="display:block;">
+            <strong style="color:var(--primary);font-size:13px;">{{ r.pergunta }}</strong>
+            <p style="margin:6px 0 0;font-size:13.5px;color:var(--text);">{{ r.resposta }}</p>
+            {% if r.observacao %}
+              <p style="margin:4px 0 0;font-size:12px;color:var(--subtext);">{{ r.observacao }}</p>
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+  {% elif not pendente %}
+    <div class="empty-state"><div class="empty-ic">📋</div><p>Você ainda não tem nenhuma anamnese registrada.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

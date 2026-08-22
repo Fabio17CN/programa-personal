@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Montar ficha de treino{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar"><h2>Montar ficha de treino</h2></div>
+  <p style="color:var(--subtext);font-size:12.5px;margin-top:-8px;">
+    Escolha o aluno pra montar (ou editar) a ficha de treino semanal dele.
+  </p>
+
+  <form method="get" class="search-bar">
+    <input type="text" name="q" value="{{ termo }}" placeholder="Buscar aluno por nome" autofocus>
+    <button type="submit" class="btn btn-primary" style="width:auto;margin:0;padding:12px 16px;">Buscar</button>
+  </form>
+
+  <div class="section-title">Selecione o aluno</div>
+  {% if alunos %}
+    {% for a in alunos %}
+      <a href="{{ url_for('treino_novo', aluno_id=a.id) }}" class="aluno-item">
+        <div>
+          <div class="nome">{{ a.nome }}</div>
+          <div class="sub">{{ a.academia or 'Sem academia definida' }}{% if a.objetivo %} · {{ a.objetivo }}{% endif %}</div>
+        </div>
+        <div class="arrow">📝</div>
+      </a>
+    {% endfor %}
+  {% else %}
+    <p style="color:var(--subtext);font-size:13px;">
+      Nenhum aluno {% if termo %}encontrado{% else %}cadastrado ainda{% endif %}.
+      {% if not termo %}<a href="{{ url_for('aluno_novo') }}" class="btn-link">Cadastrar o primeiro aluno</a>{% endif %}
+    </p>
+  {% endif %}
+</div>
+{% endblock %}

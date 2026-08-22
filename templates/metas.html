@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Metas dos Alunos{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar"><h2>Metas dos Alunos</h2></div>
+
+  <details class="card-toggle">
+    <summary>Nova meta</summary>
+    <form method="post" action="{{ url_for('metas_novo') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Aluno *</label>
+      <select name="aluno_id" required>
+        <option value="">Escolha o aluno...</option>
+        {% for a in alunos %}<option value="{{ a.id }}">{{ a.nome }}</option>{% endfor %}
+      </select>
+      <label>Título da meta *</label>
+      <input type="text" name="titulo" placeholder="Ex: Perder gordura, Aumentar carga no supino..." required>
+      <div class="row">
+        <div><label>Tipo</label>
+          <select name="tipo">
+            <option value="peso">Peso</option>
+            <option value="bf">% Gordura</option>
+            <option value="medida">Medida corporal</option>
+            <option value="carga">Carga/desempenho</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div><label>Unidade</label><input type="text" name="unidade" placeholder="kg, %, cm..."></div>
+      </div>
+      <div class="row">
+        <div><label>Valor inicial</label><input type="text" name="valor_inicial" inputmode="decimal"></div>
+        <div><label>Valor alvo</label><input type="text" name="valor_alvo" inputmode="decimal"></div>
+      </div>
+      <label>Prazo</label>
+      <input type="date" name="prazo">
+      <button type="submit" class="btn btn-primary">CRIAR META</button>
+    </form>
+  </details>
+
+  {% if metas %}
+    {% for m in metas %}
+      <div class="card" style="max-width:none;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+          <div>
+            <div style="font-weight:800;font-size:15px;">{{ m.titulo }}</div>
+            <div class="sub" style="color:var(--subtext);font-size:12px;margin-top:2px;">
+              {{ m.aluno_nome }}{% if m.prazo %} · prazo {{ m.prazo }}{% endif %}
+            </div>
+          </div>
+          <span class="status-chip status-{{ m.status }}">{{ m.status.replace('_',' ') }}</span>
+        </div>
+
+        {% if m.valor_alvo is not none %}
+        <div style="margin-top:12px;">
+          <div class="barra-progresso"><div class="barra-progresso-preenchida" style="width:{{ m.pct }}%;"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--subtext);margin-top:5px;">
+            <span>Atual: {{ m.valor_atual if m.valor_atual is not none else '—' }} {{ m.unidade or '' }}</span>
+            <span>Alvo: {{ m.valor_alvo }} {{ m.unidade or '' }}</span>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if m.status == 'em_andamento' %}
+        <form method="post" action="{{ url_for('metas_progresso', meta_id=m.id) }}" class="row" style="margin-top:12px;align-items:flex-end;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div style="flex:2;"><label style="margin-top:0;">Atualizar valor atual</label><input type="text" name="valor_atual" inputmode="decimal" value="{{ m.valor_atual }}"></div>
+          <button type="submit" class="btn btn-outline btn-sm" style="flex:1;margin:0;">Salvar</button>
+        </form>
+        <div class="row" style="margin-top:8px;">
+          <form method="post" action="{{ url_for('metas_status', meta_id=m.id) }}" style="flex:1;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="status" value="concluida">
+            <button type="submit" class="btn btn-success btn-sm" style="width:100%;">✓ Concluir</button>
+          </form>
+          <form method="post" action="{{ url_for('metas_status', meta_id=m.id) }}" style="flex:1;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="status" value="cancelada">
+            <button type="submit" class="btn btn-outline btn-sm" style="width:100%;">Cancelar</button>
+          </form>
+        </div>
+        {% endif %}
+
+        <form method="post" action="{{ url_for('metas_excluir', meta_id=m.id) }}"
+              onsubmit="return confirm('Excluir esta meta?');" style="margin-top:8px;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline btn-sm" style="width:100%;color:var(--danger);border-color:var(--danger);">Excluir meta</button>
+        </form>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state"><div class="empty-ic">🎯</div><p>Nenhuma meta cadastrada ainda.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

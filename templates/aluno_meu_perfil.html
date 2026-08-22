@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Meu Perfil{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('aluno_area') }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>Meu Perfil</h2>
+  </div>
+
+  <div style="text-align:center;margin-bottom:20px;">
+    <label style="display:inline-block;position:relative;cursor:pointer;">
+      <span class="avatar-topo" style="width:84px;height:84px;font-size:28px;">
+        {% if aluno.foto_perfil %}
+          <img src="{{ url_for('servir_foto_aluno', aluno_id=aluno.id, nome_arquivo=aluno.foto_perfil|basename) }}" alt="Foto de {{ aluno.nome }}">
+        {% else %}
+          {{ (aluno.nome or '?')[0]|upper }}
+        {% endif %}
+      </span>
+      <form method="post" action="{{ url_for('aluno_meu_perfil') }}" enctype="multipart/form-data" id="form-foto-aluno">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="file" name="foto_perfil" accept="image/*" style="display:none;" onchange="document.getElementById('form-foto-aluno').submit()">
+      </form>
+    </label>
+    <p style="color:var(--subtext);font-size:12px;margin-top:8px;">
+      {{ 'Toque na foto para trocar' if aluno.foto_perfil else 'Toque para adicionar uma foto' }}
+    </p>
+  </div>
+
+  <div class="card" style="max-width:none;">
+    <div class="linha-dado"><span>Nome</span><strong>{{ aluno.nome }}</strong></div>
+    {% if aluno.email %}<div class="linha-dado"><span>E-mail</span><strong>{{ aluno.email }}</strong></div>{% endif %}
+    {% if aluno.telefone %}<div class="linha-dado"><span>Telefone</span><strong>{{ aluno.telefone }}</strong></div>{% endif %}
+    {% if aluno.idade %}<div class="linha-dado"><span>Idade</span><strong>{{ aluno.idade }} anos</strong></div>{% endif %}
+    {% if aluno.sexo %}<div class="linha-dado"><span>Sexo</span><strong>{{ aluno.sexo }}</strong></div>{% endif %}
+    {% if aluno.academia %}<div class="linha-dado"><span>Academia</span><strong>{{ aluno.academia }}</strong></div>{% endif %}
+    {% if aluno.objetivo %}<div class="linha-dado"><span>Objetivo</span><strong>{{ aluno.objetivo }}</strong></div>{% endif %}
+    {% if aluno.cidade %}<div class="linha-dado"><span>Cidade</span><strong>{{ aluno.cidade }}</strong></div>{% endif %}
+  </div>
+
+  <p style="color:var(--subtext);font-size:12px;margin:14px 0 0;text-align:center;">
+    Para corrigir algum desses dados, fale com seu personal.
+  </p>
+
+  <div class="settings-list" style="margin-top:20px;">
+    <div class="settings-item" style="cursor:default;">
+      <span class="settings-item-ic">🔒</span>
+      <span class="settings-item-texto">
+        <span class="settings-item-titulo">Segurança</span>
+        <span class="settings-item-sub">{{ aluno.email or aluno.usuario }} · ID de acesso {{ 'AL%04d' % aluno.id }}</span>
+      </span>
+    </div>
+  </div>
+
+  <form method="post" action="{{ url_for('aluno_meu_perfil_senha') }}" class="card" style="max-width:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Senha atual</label>
+    <input type="password" name="senha_atual" autocomplete="current-password" required>
+    <label>Nova senha</label>
+    <input type="password" name="senha_nova" autocomplete="new-password" required>
+    <label>Confirmar nova senha</label>
+    <input type="password" name="senha_nova2" autocomplete="new-password" required>
+    <p style="font-size:11.5px;color:var(--subtext);margin-top:-6px;">
+      Mínimo 8 caracteres, com letra maiúscula, minúscula e número. Ao trocar, você continua conectado aqui,
+      mas qualquer outro aparelho logado com essa conta será desconectado.
+    </p>
+    <button type="submit" class="btn btn-primary" style="margin-top:10px;">ALTERAR SENHA</button>
+  </form>
+
+  <a href="{{ url_for('logout') }}" class="btn btn-outline" style="display:block;text-align:center;text-decoration:none;margin-top:20px;">SAIR</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.linha-dado { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); font-size:13.5px; }
+.linha-dado:last-child { border-bottom:none; }
+.linha-dado span { color:var(--subtext); }
+.linha-dado strong { color:var(--text); text-align:right; }
+</style>
+{% endblock %}

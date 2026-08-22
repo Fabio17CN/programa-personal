@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Biblioteca de Exercícios{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar"><h2>Biblioteca de Exercícios</h2></div>
+
+  <form class="search-bar" onsubmit="return false;">
+    <input type="text" id="busca-ex" placeholder="Buscar por nome, músculo ou equipamento...">
+  </form>
+  <div class="abas-filtro" id="filtro-parte-corpo"></div>
+
+  <p id="contagem-ex" style="font-size:11.5px;color:var(--subtext);margin:-6px 0 12px;"></p>
+  <div class="grid-exercicios" id="grid-ex"></div>
+  <div class="empty-state" id="vazio-ex" style="display:none;"><div class="empty-ic">🏋️</div><p>Nenhum exercício encontrado com esse filtro.</p></div>
+</div>
+
+<div class="modal-overlay" id="modal-ex">
+  <div class="modal-janela" style="text-align:left;max-height:85vh;overflow-y:auto;">
+    <img id="modal-ex-img" style="width:100%;border-radius:12px;margin-bottom:12px;background:var(--card-2);">
+    <div class="modal-titulo" id="modal-ex-nome" style="text-transform:capitalize;"></div>
+    <div id="modal-ex-musculos" style="margin-bottom:10px;"></div>
+    <ol id="modal-ex-passos" style="font-size:13px;color:var(--subtext);line-height:1.6;padding-left:20px;margin:0 0 16px;"></ol>
+    <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-ex').classList.remove('aberto')">Fechar</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const URL_INDICE = "{{ url_for('static', filename='exercicios/exercises.json') }}";
+const URL_GIFS = "{{ url_for('static', filename='exercicios/gifs/') }}";
+const LIMITE_EXIBIDOS = 60;
+
+let TODOS = [];
+let parteAtiva = 'todas';
+
+async function carregar() {
+  try {
+    const resp = await fetch(URL_INDICE);
+    TODOS = await resp.json();
+  } catch (e) {
+    TODOS = [];
+  }
+  montarFiltroPartes();
+  render();
+}
+
+function montarFiltroPartes() {
+  const partes = new Set();
+  TODOS.forEach(ex => (ex.bodyParts || []).forEach(p => partes.add(p)));
+  const container = document.getElementById('filtro-parte-corpo');
+  const lista = ['todas', ...Array.from(partes).sort()];
+  container.innerHTML = lista.map(p =>
+    `<button type="button" data-parte="${p}" class="${p === parteAtiva ? 'ativa' : ''}">${p === 'todas' ? 'Todas' : p}</button>`
+  ).join('');
+  container.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      parteAtiva = btn.dataset.parte;
+      container.querySelectorAll('button').forEach(b => b.classList.remove('ativa'));
+      btn.classList.add('ativa');
+      render();
+    });
+  });
+}
+
+function render() {
+  const termo = document.getElementById('busca-ex').value.trim().toLowerCase();
+  let filtrados = TODOS.filter(ex => {
+    if (parteAtiva !== 'todas' && !(ex.bodyParts || []).includes(parteAtiva)) return false;
+    if (!termo) return true;
+    const alvo = [ex.name, ...(ex.targetMuscles || []), ...(ex.equipment || [])].join(' ').toLowerCase();
+    return alvo.includes(termo);
+  });
+
+  document.getElementById('contagem-ex').textContent =
+    `${filtrados.length} exercício(s) encontrado(s)` + (filtrados.length > LIMITE_EXIBIDOS ? ' — refine a busca para ver mais' : '');
+  document.getElementById('vazio-ex').style.display = filtrados.length ? 'none' : 'block';
+
+  const grid = document.getElementById('grid-ex');
+  grid.innerHTML = filtrados.slice(0, LIMITE_EXIBIDOS).map((ex, i) => `
+    <div class="card-exercicio" data-idx="${TODOS.indexOf(ex)}">
+      <img src="${URL_GIFS}${ex.gif}" alt="${ex.name}" loading="lazy">
+      <div class="nome">${ex.name}</div>
+      <div class="musculo">${(ex.targetMuscles || []).join(', ')}</div>
+    </div>
+  `).join('');
+
+  grid.querySelectorAll('.card-exercicio').forEach(card => {
+    card.addEventListener('click', () => abrirDetalhe(TODOS[parseInt(card.dataset.idx, 10)]));
+  });
+}
+
+function abrirDetalhe(ex) {
+  document.getElementById('modal-ex-img').src = URL_GIFS + ex.gif;
+  document.getElementById('modal-ex-nome').textContent = ex.name;
+  document.getElementById('modal-ex-musculos').innerHTML =
+    (ex.targetMuscles || []).map(m => `<span class="chip">${m}</span>`).join('') +
+    (ex.equipment || []).map(m => `<span class="chip">${m}</span>`).join('');
+  document.getElementById('modal-ex-passos').innerHTML =
+    (ex.instructions || []).map(p => `<li>${p.replace(/^Step:\d+\s*/, '')}</li>`).join('');
+  document.getElementById('modal-ex').classList.add('aberto');
+}
+
+document.getElementById('busca-ex').addEventListener('input', () => {
+  clearTimeout(window._buscaExTimeout);
+  window._buscaExTimeout = setTimeout(render, 200);
+});
+document.getElementById('modal-ex').addEventListener('click', (e) => {
+  if (e.target.id === 'modal-ex') e.target.classList.remove('aberto');
+});
+
+carregar();
+</script>
+{% endblock %}

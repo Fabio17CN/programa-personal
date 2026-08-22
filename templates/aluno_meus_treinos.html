@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Meus Treinos{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('aluno_area') }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>Meus Treinos</h2>
+  </div>
+  <div class="section-title">{{ treinos|length }} ficha(s) de treino</div>
+
+  <div class="card" style="max-width:none;">
+    {% if treinos %}
+      {% for t in treinos %}
+        <a href="{{ url_for('aluno_treino_detalhe', treino_id=t.id) }}" class="item-lista-card" style="align-items:center;">
+          <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+            <span class="letra-badge" style="border-color:var(--primary);color:var(--primary);">{{ (t.nome_treino or '?')[0]|upper }}</span>
+            <div style="min-width:0;">
+              <div class="titulo" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.nome_treino or 'Ficha de treino' }}</div>
+              <div class="sub">{{ (t.data or '')[:10] }}</div>
+            </div>
+          </div>
+          <span class="arrow" style="color:var(--primary);">›</span>
+        </a>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state"><div class="empty-ic">🏋️</div><p>Seu personal ainda não montou nenhuma ficha de treino.</p></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

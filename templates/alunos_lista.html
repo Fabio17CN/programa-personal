@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Listar / Gerenciar alunos{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar"><h2>Listar / gerenciar alunos</h2></div>
+
+  <form method="get" class="search-bar">
+    <input type="text" name="q" value="{{ termo }}" placeholder="Buscar aluno por nome" autofocus>
+    <input type="hidden" name="status" value="{{ status_filtro }}">
+    <button type="submit" class="btn btn-primary" style="width:auto;margin:0;padding:12px 16px;">Buscar</button>
+  </form>
+
+  <div class="filtro-status-tabs">
+    {% for opcao in ['Todos', 'Ativo', 'Inativo'] %}
+    <a href="{{ url_for('alunos_lista', q=termo, status=opcao) }}"
+       class="filtro-status-tab {{ 'ativo' if status_filtro == opcao else '' }}">{{ opcao }}</a>
+    {% endfor %}
+  </div>
+
+  <div class="section-title">{{ alunos|length }} aluno(s) {{ '' if status_filtro == 'Todos' else ('(' + status_filtro.lower() + 's)') }}</div>
+
+  {% if alunos %}
+    {% for a in alunos %}
+      <div class="aluno-item-gerenciar">
+        <a href="{{ url_for('aluno_perfil', aluno_id=a.id) }}" class="aluno-item" style="flex:1;margin:0;">
+          <div>
+            <div class="nome">
+              {{ a.nome }}
+              {% if (a.status or 'Ativo') == 'Inativo' %}<span class="chip" style="color:var(--danger);border-color:var(--danger);font-size:10px;padding:1px 6px;">Inativo</span>{% endif %}
+            </div>
+            <div class="sub">{{ a.academia or 'Sem academia definida' }}{% if a.objetivo %} · {{ a.objetivo }}{% endif %}{% if a.telefone %} · {{ a.telefone }}{% endif %}</div>
+          </div>
+          <div class="arrow">›</div>
+        </a>
+        <form method="post" action="{{ url_for('aluno_excluir', aluno_id=a.id) }}"
+              onsubmit="return confirm('Excluir {{ a.nome }} e todo o histórico? Essa ação não pode ser desfeita.');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-excluir-rapido" title="Excluir aluno">🗑️</button>
+        </form>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state"><div class="empty-ic">🔍</div><p>Nenhum aluno encontrado.</p></div>
+  {% endif %}
+</div>
+
+<style>
+  .aluno-item-gerenciar { display: flex; align-items: stretch; gap: 8px; margin-bottom: 10px; }
+  .aluno-item-gerenciar .aluno-item { margin-bottom: 0; }
+  .btn-excluir-rapido {
+    width: 46px; border: 1px solid var(--border); background: var(--card);
+    border-radius: 12px; color: var(--subtext); font-size: 16px; cursor: pointer;
+  }
+  .btn-excluir-rapido:hover { border-color: var(--danger); color: var(--danger); }
+  .filtro-status-tabs { display: flex; gap: 8px; margin: 10px 0 4px; }
+  .filtro-status-tab {
+    flex: 1; text-align: center; padding: 8px 4px; border-radius: 12px;
+    border: 1px solid var(--border); color: var(--subtext); font-size: 12.5px; font-weight: 600;
+  }
+  .filtro-status-tab.ativo { border-color: var(--primary); color: var(--primary); background: rgba(212,175,55,0.08); }
+</style>
+{% endblock %}

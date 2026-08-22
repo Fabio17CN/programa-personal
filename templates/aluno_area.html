@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Minha área{% endblock %}
+{% block content %}
+<div class="container">
+
+  <div class="topbar-dash">
+    <div class="topbar-dash-left">
+      <a href="{{ url_for('aluno_meu_perfil') }}" class="btn-hamburguer">{{ svg('hamburguer') }}</a>
+      <h2>MINHA <span class="marca-nm">ÁREA</span></h2>
+    </div>
+    <div class="topbar-dash-right">
+      <a href="{{ url_for('aluno_notificacoes') }}" class="btn-sino" title="Notificações">
+        {{ svg('sino') }}
+        {% if notificacoes_nao_lidas %}
+          <span class="badge-contagem">{{ notificacoes_nao_lidas }}</span>
+        {% endif %}
+      </a>
+      <a href="{{ url_for('aluno_meu_perfil') }}" class="avatar-topo-wrap">
+        <span class="avatar-topo">
+          {% if aluno.foto_perfil %}
+            <img src="{{ url_for('servir_foto_aluno', aluno_id=aluno.id, nome_arquivo=aluno.foto_perfil|basename) }}" alt="Foto de {{ aluno.nome }}">
+          {% else %}
+            {{ (aluno.nome or '?')[0]|upper }}
+          {% endif %}
+        </span>
+        <span class="avatar-topo-info">
+          <span class="avatar-topo-nome">{{ ((aluno.nome or 'Aluno').split(' ')[0])|upper }} <span class="marca-nm">ALUNO</span></span>
+          <span class="badge-online">Online</span>
+        </span>
+      </a>
+    </div>
+  </div>
+
+  <div class="dash-top-row dash-top-row-aluno">
+    <div class="saudacao-dash-lado">
+      <p class="saudacao-dash-nome">Olá, <strong>{{ (aluno.nome or '').split(' ')[0]|upper }}</strong> 👋</p>
+      <p class="saudacao-dash-sub">Pronto para alcançar seus objetivos hoje?</p>
+    </div>
+
+    <div class="stat-hero stat-hero-3d stat-hero-compact progresso-card" onclick="abrirModalProgresso(event)" role="button" tabindex="0" aria-haspopup="dialog" style="cursor:pointer;">
+      <span class="stat-hero-ic">{{ svg('perfil') }}</span>
+      <span class="stat-hero-meio">
+        <span class="stat-hero-lbl">Seu progresso</span>
+        <span class="progresso-card-status">{{ progresso_titulo }}</span>
+        <span class="progresso-card-barra-row">
+          <span class="barra-progresso barra-progresso-mini"><span class="barra-progresso-preenchida" style="width:{{ progresso_pct }}%;"></span></span>
+          <span class="progresso-card-pct">{{ progresso_pct }}%</span>
+        </span>
+      </span>
+      <span class="arrow">›</span>
+    </div>
+  </div>
+
+  <div class="dashboard-grid dashboard-grid-aluno">
+    <a href="{{ url_for('aluno_meus_treinos') }}" class="dash-tile">
+      <span class="dash-tile-ic">{{ svg('treino') }}</span>
+      <span class="dash-tile-titulo">Meus Treinos</span>
+      <span class="dash-tile-sub">Acompanhe e execute seus treinos</span>
+    </a>
+    <a href="{{ url_for('aluno_minhas_avaliacoes') }}" class="dash-tile">
+      <span class="dash-tile-ic">{{ svg('avaliacao') }}</span>
+      <span class="dash-tile-titulo">Minha Avaliação</span>
+      <span class="dash-tile-sub">Veja seus resultados e evoluções</span>
+    </a>
+    <a href="#" onclick="abrirModalAnamnese(event)" class="dash-tile">
+      <span class="dash-tile-ic">{{ svg('anotacao') }}</span>
+      <span class="dash-tile-titulo">Minha Anamnese</span>
+      <span class="dash-tile-sub">Suas informações e histórico</span>
+    </a>
+    <a href="{{ url_for('aluno_minha_agenda') }}" class="dash-tile">
+      <span class="dash-tile-ic">{{ svg('agenda') }}</span>
+      <span class="dash-tile-titulo">Agenda</span>
+      <span class="dash-tile-sub">Veja seus compromissos</span>
+    </a>
+    <a href="{{ url_for('aluno_minhas_mensagens') }}" class="dash-tile">
+      <span class="dash-tile-ic">{{ svg('mensagem') }}</span>
+      <span class="dash-tile-titulo">Mensagens</span>
+      <span class="dash-tile-sub">Fale com seu professor</span>
+      {% if mensagens_nao_lidas %}<span class="dash-tile-badge">{{ mensagens_nao_lidas }}</span>{% endif %}
+    </a>
+    <a href="{{ url_for('aluno_meu_perfil') }}" class="dash-tile">
+      <span class="dash-tile-ic">{{ svg('perfil') }}</span>
+      <span class="dash-tile-titulo">Meu Perfil</span>
+      <span class="dash-tile-sub">Seus dados e preferências</span>
+    </a>
+  </div>
+
+  <div class="resumo-dia">
+    <div class="resumo-dia-titulo">Resumo rápido <span class="arrow">↗</span></div>
+    <div class="resumo-dia-grid resumo-dia-grid-3">
+      <a href="{{ url_for('aluno_meus_treinos') }}" class="resumo-dia-item">
+        <span class="resumo-dia-item-ic">{{ svg('treino') }}</span>
+        <div class="num">{{ treinos_semana }}</div>
+        <div class="lbl">Treinos esta semana</div>
+        <div class="link">Ver treinos</div>
+      </a>
+      <a href="{{ url_for('aluno_minha_agenda') }}" class="resumo-dia-item">
+        <span class="resumo-dia-item-ic">{{ svg('agenda') }}</span>
+        <div class="num">{{ compromissos_hoje }}</div>
+        <div class="lbl">Compromissos hoje</div>
+        <div class="link">Ver agenda</div>
+      </a>
+      <a href="{{ url_for('aluno_meu_perfil') }}" class="resumo-dia-item">
+        <span class="resumo-dia-item-ic">{{ svg('checkin') }}</span>
+        <div class="num">{{ progresso_pct }}%</div>
+        <div class="lbl">Meta semanal</div>
+        <div class="link">Ver metas</div>
+      </a>
+    </div>
+  </div>
+
+  {% set frase_motivacional = (personal.slogan if personal else none) or frase_dia or 'Seu corpo alcança o que sua mente acredita.' %}
+  {% set partes_frase = frase_motivacional.rsplit(' ', 1) %}
+  <div class="quote-footer">
+    <div class="quote-footer-conteudo">
+      <span class="aspas">&ldquo;</span>
+      <div class="texto">
+        {%- if partes_frase|length == 2 -%}
+          {{ partes_frase[0] }} <span class="frase-destaque">{{ partes_frase[1] }}</span>
+        {%- else -%}
+          {{ frase_motivacional }}
+        {%- endif -%}
+      </div>
+      <div class="assinatura">FOCO &bull; DISCIPLINA &bull; CONSTÂNCIA</div>
+    </div>
+    <div class="quote-footer-foto" style="background-image:url('{{ url_for('static', filename='img/quote-atleta.jpg') }}')"></div>
+  </div>
+
+</div>
+
+<!-- Modal "Seu progresso": abre por cima da tela sem sair de MINHA ÁREA.
+     Mostra a barra/percentual (sempre) e, quando já existe avaliação
+     finalizada, o comparativo e o gráfico de evolução (peso/BF), que
+     cresce sozinho a cada nova avaliação que o personal finalizar. -->
+<div class="modal-overlay modal-overlay-anamnese" id="modalProgresso">
+  <div class="modal-janela-anamnese" role="dialog" aria-modal="true">
+    <div class="modal-anamnese-header">
+      <h3 class="modal-titulo" style="margin:0;">Seu progresso</h3>
+      <button type="button" class="modal-anamnese-fechar" onclick="fecharModalProgresso()" aria-label="Fechar">✕</button>
+    </div>
+    <div class="modal-anamnese-corpo">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <span class="progresso-card-status" style="font-size:16px;">{{ progresso_titulo }}</span>
+        <span class="progresso-card-pct" style="font-size:13px;">{{ progresso_pct }}%</span>
+      </div>
+      <span class="barra-progresso barra-progresso-mini" style="display:block;margin:8px 0 18px;"><span class="barra-progresso-preenchida" style="width:{{ progresso_pct }}%;"></span></span>
+
+      {% if total_avaliacoes %}
+        <div class="section-title" style="margin-top:0;">
+          Evolução{% if data_inicio_avaliacao %} <span style="color:var(--subtext);font-weight:500;">· desde {{ data_inicio_avaliacao }}</span>{% endif %}
+        </div>
+        {% if comparativo_evolucao %}
+          <div class="comparativo-card" style="margin-bottom:6px;">
+            {% for item in comparativo_evolucao %}
+              <div class="comparativo-item">
+                <span>{{ item.rotulo }}</span>
+                <span class="{{ 'valor-positivo' if item.positivo else 'valor-negativo' }}">
+                  {{ '+' if item.diferenca > 0 else '' }}{{ item.diferenca }}{{ item.unidade }}
+                  {{ '▲' if item.diferenca > 0 else '▼' }}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        <div class="chart-legenda">
+          <span class="legenda-item"><i style="background:#3B82F6;"></i>Peso (kg)</span>
+          <span class="legenda-item"><i style="background:#10B981;"></i>BF (%)</span>
+        </div>
+        <div id="chartEvolucaoAluno" class="mini-chart mini-chart-lg"></div>
+      {% else %}
+        <p style="color:var(--subtext);font-size:12px;text-align:center;padding:10px 0;">
+          Seu personal ainda não registrou nenhuma avaliação física finalizada.
+          O gráfico aparece aqui automaticamente assim que a 1ª avaliação for concluída.
+        </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.abrirModalProgresso = function (ev) {
+  if (ev) ev.preventDefault();
+  document.getElementById('modalProgresso').classList.add('aberto');
+};
+window.fecharModalProgresso = function () {
+  document.getElementById('modalProgresso').classList.remove('aberto');
+};
+// Fecha ao tocar fora da janela (no fundo escurecido).
+document.getElementById('modalProgresso').addEventListener('click', function (ev) {
+  if (ev.target === this) fecharModalProgresso();
+});
+// Acessibilidade: também abre com Enter/Espaço quando o card está focado.
+document.querySelector('.progresso-card').addEventListener('keydown', function (ev) {
+  if (ev.key === 'Enter' || ev.key === ' ') {
+    ev.preventDefault();
+    abrirModalProgresso();
+  }
+});
+</script>
+{% if total_avaliacoes %}
+<script>
+// Gráfico combinado (peso + BF), em SVG puro — mesmo desenho usado no
+// painel do personal, só que aqui alimentado pelas próprias avaliações
+// do aluno logado. Cresce sozinho a cada nova avaliação finalizada.
+function desenharGraficoEvolucaoAluno(containerId, labels, seriePeso, serieBf) {
+  const container = document.getElementById(containerId);
+  const w = 340, h = 210, padL = 8, padR = 8, padT = 18, padB = 26;
+
+  function prepararSerie(valores) {
+    const pares = labels.map((l, i) => [l, valores[i]]).filter(p => p[1] !== null && p[1] !== undefined);
+    if (pares.length === 0) return null;
+    const vals = pares.map(p => p[1]);
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const faixa = (max - min) || Math.max(1, max * 0.1) || 1;
+    const passoX = pares.length > 1 ? (w - padL - padR) / (pares.length - 1) : 0;
+    const pontos = pares.map((p, i) => {
+      const x = padL + i * passoX;
+      const y = padT + (h - padT - padB) - ((p[1] - min) / faixa) * (h - padT - padB);
+      return { x, y, valor: p[1], label: p[0] };
+    });
+    return pontos;
+  }
+
+  const pontosPeso = prepararSerie(seriePeso);
+  const pontosBf = prepararSerie(serieBf);
+
+  if (!pontosPeso && !pontosBf) {
+    container.innerHTML = '<div style="color:var(--subtext);font-size:12px;text-align:center;padding:40px 0;">Sem dados suficientes ainda.</div>';
+    return;
+  }
+
+  // Com só 1 avaliação registrada ainda não dá pra desenhar uma linha —
+  // mostra os valores atuais em destaque e avisa que o gráfico aparece
+  // de verdade a partir da 2ª avaliação.
+  const totalPontos = Math.max(pontosPeso ? pontosPeso.length : 0, pontosBf ? pontosBf.length : 0);
+  if (totalPontos < 2) {
+    const ultimoPeso = pontosPeso ? pontosPeso[pontosPeso.length - 1].valor : null;
+    const ultimoBf = pontosBf ? pontosBf[pontosBf.length - 1].valor : null;
+    container.innerHTML = `
+      <div style="text-align:center;padding:18px 0 8px;">
+        <div style="display:flex;justify-content:center;gap:28px;">
+          ${ultimoPeso !== null ? `<div><div style="font-size:22px;font-weight:800;color:#3B82F6;">${ultimoPeso}<span style="font-size:12px;">kg</span></div><div style="font-size:10.5px;color:var(--subtext);">PESO ATUAL</div></div>` : ''}
+          ${ultimoBf !== null ? `<div><div style="font-size:22px;font-weight:800;color:#10B981;">${ultimoBf}<span style="font-size:12px;">%</span></div><div style="font-size:10.5px;color:var(--subtext);">BF ATUAL</div></div>` : ''}
+        </div>
+        <p style="color:var(--subtext);font-size:11.5px;margin:14px 0 0;">
+          Essa é a sua primeira avaliação registrada. O gráfico de evolução aparece
+          automaticamente a partir da 2ª avaliação.
+        </p>
+      </div>`;
+    return;
+  }
+
+  function caminhoSuave(pontos) {
+    if (pontos.length === 1) return `M ${pontos[0].x} ${pontos[0].y}`;
+    let d = `M ${pontos[0].x} ${pontos[0].y}`;
+    for (let i = 0; i < pontos.length - 1; i++) {
+      const p0 = pontos[i], p1 = pontos[i + 1];
+      const midX = (p0.x + p1.x) / 2;
+      d += ` C ${midX} ${p0.y}, ${midX} ${p1.y}, ${p1.x} ${p1.y}`;
+    }
+    return d;
+  }
+
+  function blocoSerie(pontos, cor, id) {
+    if (!pontos) return '';
+    const linha = caminhoSuave(pontos);
+    const area = `${linha} L ${pontos[pontos.length - 1].x} ${h - padB} L ${pontos[0].x} ${h - padB} Z`;
+    const circulos = pontos.map((p, i) => {
+      const destaque = i === pontos.length - 1;
+      return `<g>
+              <title>${p.label}: ${p.valor}</title>
+              <circle cx="${p.x}" cy="${p.y}" r="${destaque ? 4.5 : 3}" fill="${cor}" stroke="#0A0806" stroke-width="1.4"></circle>
+              <text x="${p.x}" y="${p.y - 10}" font-size="9.5" font-weight="700" fill="#F8FAFC" text-anchor="middle">${p.valor}</text>
+              </g>`;
+    }).join('');
+    return `
+      <defs><linearGradient id="grad-${id}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${cor}" stop-opacity="0.35"></stop>
+        <stop offset="100%" stop-color="${cor}" stop-opacity="0"></stop>
+      </linearGradient></defs>
+      <path d="${area}" fill="url(#grad-${id})" stroke="none"></path>
+      <path d="${linha}" fill="none" stroke="${cor}" stroke-width="2.6" stroke-linecap="round"></path>
+      ${circulos}`;
+  }
+
+  const baseRotulos = pontosPeso || pontosBf;
+  const rotulos = baseRotulos.map(p =>
+    `<text x="${p.x}" y="${h - 8}" font-size="9" fill="#94A3B8" text-anchor="middle">${(p.label || '').slice(5)}</text>`
+  ).join('');
+  const grades = [0.25, 0.5, 0.75].map(f => {
+    const y = padT + (h - padT - padB) * f;
+    return `<line x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}" stroke="#17130D" stroke-width="1"></line>`;
+  }).join('');
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:${h}px;">
+      ${grades}
+      ${blocoSerie(pontosPeso, '#3B82F6', 'peso')}
+      ${blocoSerie(pontosBf, '#10B981', 'bf')}
+      ${rotulos}
+    </svg>`;
+}
+
+fetch("{{ url_for('aluno_evolucao_dados_json') }}")
+  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+  .then(d => {
+    try {
+      desenharGraficoEvolucaoAluno('chartEvolucaoAluno', d.labels, d.peso, d.bf);
+    } catch (erroDesenho) {
+      console.error('Erro ao desenhar gráfico de evolução:', erroDesenho);
+      document.getElementById('chartEvolucaoAluno').innerHTML =
+        '<div style="color:var(--subtext);font-size:12px;text-align:center;padding:24px 0;">Não foi possível desenhar o gráfico agora. Tente recarregar a página.</div>';
+    }
+  })
+  .catch(erro => {
+    console.error('Erro ao buscar dados de evolução:', erro);
+    document.getElementById('chartEvolucaoAluno').innerHTML =
+      '<div style="color:var(--subtext);font-size:12px;text-align:center;padding:24px 0;">Não foi possível carregar a evolução agora.</div>';
+  });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Criar conta - Aluno{% endblock %}
+{% block content %}
+<div class="center-screen login-bg">
+  <div class="login-glow"></div>
+  <div class="card login-card card-vidro" style="max-width:420px;">
+    <h1 class="brand brand-elegant" style="text-align:center;">ATIVAR MEU ACESSO</h1>
+
+    {% if not etapa_dados %}
+    <!-- ETAPA 1: e-mail + código (o personal já cadastrou o e-mail e o
+         código foi enviado automaticamente ao finalizar a ficha) -->
+    <div id="etapa-codigo">
+      <p class="cadastro-passo-desc">
+        Informe o e-mail que seu personal cadastrou na sua ficha e o código
+        de 6 dígitos que foi enviado para ele. Válido por 10 minutos, até 3 tentativas.
+      </p>
+      <label for="campo-email">E-mail cadastrado pelo personal</label>
+      <input type="email" id="campo-email" autocomplete="email" placeholder="seuemail@exemplo.com" required>
+      <label for="campo-codigo">Código de verificação</label>
+      <input type="password" id="campo-codigo" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
+      <p class="cadastro-erro" id="erro-codigo"></p>
+      <button type="button" class="btn btn-primary" id="btn-confirmar-codigo">CONFIRMAR CÓDIGO →</button>
+
+      <div class="caixa-reenvio">
+        <p class="caixa-reenvio-titulo">Não recebeu o código?</p>
+        <p class="caixa-reenvio-texto">
+          Confira a caixa de spam ou, se o personal demorou pra te cadastrar,
+          peça um novo código informando o e-mail acima.
+        </p>
+        <button type="button" class="btn-link" id="btn-reenviar-codigo-aluno">Reenviar código</button>
+        <p class="cadastro-erro" id="msg-reenviar-aluno" style="margin-top:6px;"></p>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ETAPA 2: boas-vindas + senha -->
+    <div id="etapa-dados" class="etapa-dados-senha" style="{{ '' if etapa_dados else 'display:none;' }}">
+      <p class="cadastro-passo-desc texto-boas-vindas" id="texto-boas-vindas">
+        {% if nome %}Boas-vindas, {{ nome }}!{% else %}Boas-vindas!{% endif %}<br>
+        Agora é só criar sua senha de acesso.
+      </p>
+      <form method="post" action="{{ url_for('aluno_criar_conta_finalizar') }}" class="form-senha-ativacao">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="campo-senha-nova">Senha</label>
+        <input type="password" id="campo-senha-nova" name="senha" autocomplete="new-password" required>
+        <label for="campo-senha-confirma">Confirmar senha</label>
+        <input type="password" id="campo-senha-confirma" name="senha2" autocomplete="new-password" required>
+        <p class="dica-senha">
+          Mínimo 8 caracteres, com letra maiúscula, minúscula e número.
+        </p>
+        <button type="submit" class="btn btn-primary">CRIAR MINHA CONTA</button>
+      </form>
+    </div>
+
+    <a href="{{ url_for('criar_conta_escolha') }}" class="btn btn-link">Voltar</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .cadastro-passo-desc { color: var(--subtext); font-size: 13px; line-height: 1.5; margin-bottom: 14px; }
+  .cadastro-erro { color: #e05252; font-size: 12.5px; min-height: 16px; margin: -6px 0 8px; }
+
+  .caixa-reenvio {
+    margin-top: 18px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.03);
+    text-align: center;
+  }
+  .caixa-reenvio-titulo { font-size: 13px; font-weight: 700; color: var(--text); margin: 0 0 4px; }
+  .caixa-reenvio-texto { font-size: 12px; color: var(--subtext); line-height: 1.5; margin: 0 0 8px; }
+  .caixa-reenvio .btn-link { font-size: 12.5px; padding: 0; }
+
+  /* Etapa 2 (boas-vindas + senha): estrutura explícita em coluna, sem
+     posicionamento absoluto, para o texto de boas-vindas nunca ficar em
+     cima dos campos de senha, mesmo quando o nome do aluno é longo. */
+  .etapa-dados-senha { display: flex; flex-direction: column; }
+  .etapa-dados-senha .texto-boas-vindas {
+    position: static;
+    text-align: center;
+    font-size: 15px;
+    margin: 0 0 18px;
+  }
+  .form-senha-ativacao { display: flex; flex-direction: column; }
+  .form-senha-ativacao label { position: static; margin: 12px 0 6px; }
+  .form-senha-ativacao input { position: static; }
+  .form-senha-ativacao .dica-senha {
+    color: var(--subtext); font-size: 12px; margin: 6px 0 4px;
+  }
+</style>
+<script>
+(function () {
+  var csrf = "{{ csrf_token() }}";
+  var etapaCodigo = document.getElementById('etapa-codigo');
+  var etapaDados = document.getElementById('etapa-dados');
+
+  function post(url, dados) {
+    var form = new FormData();
+    form.append('csrf_token', csrf);
+    for (var chave in dados) form.append(chave, dados[chave]);
+    return fetch(url, { method: 'POST', body: form }).then(function (r) {
+      return r.json().then(function (json) { return { status: r.status, json: json }; });
+    });
+  }
+
+  if (document.getElementById('btn-confirmar-codigo')) {
+    document.getElementById('btn-confirmar-codigo').addEventListener('click', function () {
+      var email = document.getElementById('campo-email').value.trim();
+      var codigo = document.getElementById('campo-codigo').value.trim();
+      document.getElementById('erro-codigo').textContent = '';
+      post("{{ url_for('aluno_criar_conta_verificar_codigo') }}", { email: email, codigo: codigo }).then(function (res) {
+        if (!res.json.ok) {
+          document.getElementById('erro-codigo').textContent = res.json.erro;
+          return;
+        }
+        var textoBoasVindas = document.getElementById('texto-boas-vindas');
+        if (textoBoasVindas && res.json.nome) {
+          textoBoasVindas.textContent = '';
+          textoBoasVindas.appendChild(document.createTextNode('Boas-vindas, ' + res.json.nome + '!'));
+          textoBoasVindas.appendChild(document.createElement('br'));
+          textoBoasVindas.appendChild(document.createTextNode('Agora é só criar sua senha de acesso.'));
+        }
+        etapaCodigo.style.display = 'none';
+        etapaDados.style.display = 'flex';
+      });
+    });
+  }
+
+  // Autoatendimento: se o personal demorou pra cadastrar/enviar o
+  // e-mail original, o próprio aluno pode pedir um novo código
+  // informando o e-mail que ele sabe que o personal usou na ficha dele.
+  if (document.getElementById('btn-reenviar-codigo-aluno')) {
+    document.getElementById('btn-reenviar-codigo-aluno').addEventListener('click', function () {
+      var email = document.getElementById('campo-email').value.trim();
+      var msg = document.getElementById('msg-reenviar-aluno');
+      var btn = this;
+      if (!email) {
+        msg.style.color = 'var(--danger)';
+        msg.textContent = 'Digite o e-mail cadastrado pelo seu personal ali em cima primeiro.';
+        return;
+      }
+      btn.disabled = true;
+      msg.style.color = 'var(--subtext)';
+      msg.textContent = 'Enviando...';
+      post("{{ url_for('aluno_criar_conta_reenviar_codigo') }}", { email: email }).then(function (res) {
+        btn.disabled = false;
+        msg.style.color = res.json.ok ? 'var(--success)' : 'var(--danger)';
+        msg.textContent = res.json.ok ? res.json.mensagem : res.json.erro;
+      }).catch(function () {
+        btn.disabled = false;
+        msg.style.color = 'var(--danger)';
+        msg.textContent = 'Falha de conexão. Tente novamente.';
+      });
+    });
+  }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block title %}Agenda de atendimentos{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="page-hero">
+    <div class="page-hero-row">
+      <div class="page-hero-ic">🗓️</div>
+      <div>
+        <h2>Agenda de atendimentos</h2>
+        <p>Marque os horários com cada aluno — com a aba aberta, o sistema avisa sozinho (som + notificação) na hora certa.</p>
+      </div>
+    </div>
+  </div>
+
+  <button type="button" id="btn-ativar-avisos" class="btn btn-outline" style="margin-bottom:14px;">
+    🔔 Ativar aviso sonoro / notificação neste navegador
+  </button>
+  <div id="status-avisos" style="font-size:12px;color:var(--subtext);margin:-8px 0 14px;"></div>
+
+  <div class="tabs-agenda">
+    <button type="button" class="tab-agenda-btn ativo" data-alvo="painel-fixo">🔁 Horário fixo semanal</button>
+    <button type="button" class="tab-agenda-btn" data-alvo="painel-avulso">📌 Agendamento avulso</button>
+  </div>
+
+  <div id="painel-fixo" class="painel-tab-agenda">
+    <p style="color:var(--subtext);font-size:12px;margin-top:2px;">
+      Pra alunos que treinam sempre no mesmo dia e horário — programe uma vez e ele se repete toda semana sozinho.
+    </p>
+    <div class="card card-agenda" style="max-width:none;">
+      <form method="post" action="{{ url_for('agenda_fixo_novo') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>Aluno</label>
+        <select name="aluno_id" required>
+          <option value="">— escolha o aluno —</option>
+          {% for a in alunos %}
+            <option value="{{ a.id }}">{{ a.nome }}</option>
+          {% endfor %}
+        </select>
+        <div class="row-2">
+          <div>
+            <label>Dia da semana</label>
+            <select name="dia_semana" required>
+              {% for i, nome in enumerate(dias_semana_label) %}
+                <option value="{{ i }}">{{ nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label>Horário</label>
+            <input type="time" name="hora" required>
+          </div>
+        </div>
+        <label>Duração (minutos)</label>
+        <input type="number" name="duracao_min" value="60" min="10" step="5">
+        <button type="submit" class="btn btn-primary" style="margin-top:10px;">PROGRAMAR HORÁRIO FIXO</button>
+      </form>
+    </div>
+
+    {% for i, nome_dia in enumerate(dias_semana_label) %}
+      {% if grade_semana[i] %}
+        <div class="dia-fixo-titulo">{{ nome_dia }}</div>
+        {% for hf in grade_semana[i] %}
+          <div class="agenda-item">
+            <div class="agenda-quando">
+              <div class="agenda-hora">{{ hf.hora }}</div>
+            </div>
+            <div class="agenda-info">
+              <div class="nome">{{ hf.aluno_nome }}</div>
+              <div class="sub">{{ hf.duracao_min }} min · toda {{ nome_dia.lower() }}</div>
+            </div>
+            <form method="post" action="{{ url_for('agenda_fixo_excluir', horario_id=hf.id) }}"
+                  onsubmit="return confirm('Remover esse horário fixo?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn-excluir-rapido" title="Remover">🗑️</button>
+            </form>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <div id="painel-avulso" class="painel-tab-agenda" style="display:none;">
+    <p style="color:var(--subtext);font-size:12px;margin-top:2px;">
+      Pra um atendimento pontual, numa data específica.
+    </p>
+    <div class="card card-agenda" style="max-width:none;">
+      <form method="post" action="{{ url_for('agenda_novo') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>Aluno (opcional)</label>
+        <select name="aluno_id">
+          <option value="">— sem aluno vinculado —</option>
+          {% for a in alunos %}
+            <option value="{{ a.id }}">{{ a.nome }}</option>
+          {% endfor %}
+        </select>
+
+        <label>Título (opcional — se deixar em branco, usa o nome do aluno)</label>
+        <input type="text" name="titulo" placeholder="Ex: Treino de pernas">
+
+        <div class="row-2">
+          <div>
+            <label>Data</label>
+            <input type="date" name="data" required>
+          </div>
+          <div>
+            <label>Horário</label>
+            <input type="time" name="hora" required>
+          </div>
+        </div>
+
+        <label>Duração (minutos)</label>
+        <input type="number" name="duracao_min" value="60" min="10" step="5">
+
+        <label>Observação (opcional)</label>
+        <textarea name="observacao" placeholder="Ex: levar avaliação impressa"></textarea>
+
+        <button type="submit" class="btn btn-primary" style="margin-top:10px;">AGENDAR</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="section-title">🕐 Próximos atendimentos</div>
+  {% if futuros %}
+    {% for ag in futuros %}
+      <div class="agenda-item">
+        <div class="agenda-quando">
+          <div class="agenda-dia">{{ ag.data_hora[8:10] }}/{{ ag.data_hora[5:7] }}</div>
+          <div class="agenda-hora">{{ ag.data_hora[11:16] }}</div>
+        </div>
+        <div class="agenda-info">
+          <div class="nome">{{ ag.titulo }}</div>
+          {% if ag.aluno_nome %}<div class="sub">{{ ag.aluno_nome }}{% if ag.aluno_telefone %} · {{ ag.aluno_telefone }}{% endif %}</div>{% endif %}
+          {% if ag.observacao %}<div class="sub">{{ ag.observacao }}</div>{% endif %}
+        </div>
+        <form method="post" action="{{ url_for('agenda_excluir', agendamento_id=ag.id) }}"
+              onsubmit="return confirm('Remover este atendimento da agenda?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-excluir-rapido" title="Remover">🗑️</button>
+        </form>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state"><div class="empty-ic">🗓️</div><p>Nenhum atendimento agendado ainda.</p></div>
+  {% endif %}
+
+  {% if passados %}
+  <div class="section-title">✅ Últimos atendimentos</div>
+  {% for ag in passados %}
+    <div class="agenda-item agenda-item-passado">
+      <div class="agenda-quando">
+        <div class="agenda-dia">{{ ag.data_hora[8:10] }}/{{ ag.data_hora[5:7] }}</div>
+        <div class="agenda-hora">{{ ag.data_hora[11:16] }}</div>
+      </div>
+      <div class="agenda-info">
+        <div class="nome">{{ ag.titulo }}</div>
+        {% if ag.aluno_nome %}<div class="sub">{{ ag.aluno_nome }}</div>{% endif %}
+      </div>
+    </div>
+  {% endfor %}
+  {% endif %}
+</div>
+
+<div id="alarme-banner" class="alarme-banner" style="display:none;">
+  <div class="alarme-icone">⏰</div>
+  <div class="alarme-texto">
+    <div class="alarme-titulo">Hora do atendimento!</div>
+    <div id="alarme-detalhe"></div>
+  </div>
+  <button type="button" id="alarme-fechar" class="btn-excluir-rapido">✕</button>
+</div>
+
+<style>
+  .row-2 { display: flex; gap: 10px; }
+  .row-2 > div { flex: 1; }
+
+  .tabs-agenda {
+    display: flex; gap: 8px; margin-bottom: 14px;
+    background: var(--card-2); border-radius: 12px; padding: 4px;
+  }
+  .tab-agenda-btn {
+    flex: 1; border: none; background: transparent; color: var(--subtext);
+    padding: 10px 8px; border-radius: 9px; font-size: 12.5px; font-weight: 700;
+    cursor: pointer; transition: background .15s ease, color .15s ease;
+  }
+  .tab-agenda-btn.ativo {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff; box-shadow: 0 6px 16px rgba(59,130,246,0.35);
+  }
+  .card-agenda { box-shadow: 0 16px 40px rgba(0,0,0,0.35); margin-bottom: 16px; }
+
+  .agenda-item {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px 12px; margin-bottom: 8px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.22);
+  }
+  .agenda-item-passado { opacity: 0.55; box-shadow: none; }
+  .agenda-quando {
+    flex: 0 0 56px; text-align: center; background: var(--card-2); border-radius: 10px; padding: 6px 4px;
+  }
+  .agenda-dia { font-size: 11px; color: var(--subtext); }
+  .agenda-hora { font-size: 15px; font-weight: 800; color: var(--primary); }
+  .agenda-info { flex: 1; }
+  .agenda-info .nome { font-weight: 700; font-size: 14px; }
+  .agenda-info .sub { font-size: 12px; color: var(--subtext); }
+  .dia-fixo-titulo {
+    font-size: 12px; font-weight: 800; color: var(--primary); text-transform: uppercase;
+    letter-spacing: 0.5px; margin: 14px 0 6px;
+  }
+
+  .alarme-banner {
+    position: fixed; left: 16px; right: 16px; bottom: 90px; z-index: 999;
+    display: flex; align-items: center; gap: 12px;
+    background: var(--warning); color: #1B1206; border-radius: 14px; padding: 14px 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  }
+  .alarme-icone { font-size: 26px; }
+  .alarme-titulo { font-weight: 800; font-size: 14px; }
+  #alarme-detalhe { font-size: 12.5px; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.tab-agenda-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-agenda-btn').forEach(b => b.classList.remove('ativo'));
+    document.querySelectorAll('.painel-tab-agenda').forEach(p => p.style.display = 'none');
+    btn.classList.add('ativo');
+    document.getElementById(btn.dataset.alvo).style.display = 'block';
+  });
+});
+
+const proximosAgendamentos = {{ proximos_json | safe }};
+const statusEl = document.getElementById('status-avisos');
+
+function tocarBip() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.35, 0.7].forEach(function (atraso) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.value = 0.18;
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + atraso);
+      osc.stop(ctx.currentTime + atraso + 0.28);
+    });
+  } catch (e) { /* navegador sem suporte a Web Audio — ignora silenciosamente */ }
+}
+
+function dispararAlarme(ag) {
+  tocarBip();
+  const detalhe = document.getElementById('alarme-detalhe');
+  detalhe.textContent = ag.titulo + (ag.aluno_nome ? ' — ' + ag.aluno_nome : '');
+  const banner = document.getElementById('alarme-banner');
+  banner.style.display = 'flex';
+
+  if (window.Notification && Notification.permission === 'granted') {
+    new Notification('Hora do atendimento!', { body: detalhe.textContent, icon: '{{ url_for("static", filename="icon-192.png") }}' });
+  }
+}
+
+// Agenda um alarme (som + notificação + banner) pra cada atendimento das próximas ~18h.
+proximosAgendamentos.forEach(function (ag) {
+  const alvo = new Date(ag.data_hora).getTime();
+  const espera = alvo - Date.now();
+  if (espera > 0 && espera < 18 * 60 * 60 * 1000) {
+    setTimeout(function () { dispararAlarme(ag); }, espera);
+  }
+});
+
+document.getElementById('alarme-fechar').addEventListener('click', function () {
+  document.getElementById('alarme-banner').style.display = 'none';
+});
+
+document.getElementById('btn-ativar-avisos').addEventListener('click', function () {
+  // Precisa de um clique do usuário pra "destravar" áudio e notificação no navegador.
+  tocarBip();
+  if (window.Notification) {
+    Notification.requestPermission().then(function (permissao) {
+      statusEl.textContent = permissao === 'granted'
+        ? 'Avisos ativados! Deixe esta aba aberta perto do horário do atendimento.'
+        : 'Notificação não liberada — mas o som continua funcionando com a aba aberta.';
+    });
+  } else {
+    statusEl.textContent = 'Som ativado! Deixe esta aba aberta perto do horário do atendimento.';
+  }
+});
+</script>
+{% endblock %}

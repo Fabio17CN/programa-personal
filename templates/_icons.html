@@ -1,0 +1,87 @@
+{# Ícones em SVG do Painel NM — todos herdam a cor do texto (currentColor),
+   por isso ficam dourados sozinhos dentro dos blocos do painel.
+   Um só arquivo de ícones evita repetir os mesmos <svg> em cada tela. #}
+
+{% macro svg(nome) %}
+{%- if nome == 'cadastrar-aluno' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7.5" r="3.2"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6"/><path d="M18 8v6M15 11h6"/></svg>
+{%- elif nome == 'alunos' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="7.5" r="3"/><path d="M2.5 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="8.3" r="2.3"/><path d="M15.2 20c.2-2.6 2-4.5 4.3-4.8"/></svg>
+{%- elif nome == 'treino' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5M6.2 7.3v9.4M17.8 7.3v9.4M20 9.5v5M6.2 12h11.6"/></svg>
+{%- elif nome == 'lista' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3.3h6v2.6H9z"/><path d="M8 11.2h8M8 14.6h8M8 18h5"/></svg>
+{%- elif nome == 'agenda' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M8 3v3.5M16 3v3.5"/></svg>
+{%- elif nome == 'avaliacao' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16l5-6 4 4 8-9"/><path d="M14 5h6v6"/></svg>
+{%- elif nome == 'financeiro' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.3"/><path d="M12 7.5v9"/><path d="M14.6 9.6c-.4-.8-1.3-1.4-2.6-1.4-1.5 0-2.6.8-2.6 1.9s1 1.5 2.6 1.9c1.6.4 2.6.9 2.6 1.9s-1.1 1.9-2.6 1.9c-1.3 0-2.2-.5-2.6-1.4"/></svg>
+{%- elif nome == 'relatorios' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V13M12 20V8M19 20v-5"/></svg>
+{%- elif nome == 'plano' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12v16l-6-4-6 4V4z"/></svg>
+{%- elif nome == 'mensagem' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7.4a2 2 0 0 1-2 2H9.3l-3.8 3.4v-3.4H6a2 2 0 0 1-2-2V6.3z"/></svg>
+{%- elif nome == 'anotacao' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h8.5L19 8v12.5H6V3.5z"/><path d="M14.5 3.5V8H19"/><path d="M9 12.3h6M9 15.8h4.3"/></svg>
+{%- elif nome == 'meta' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.3"/><circle cx="12" cy="12" r="0.9" fill="currentColor" stroke="none"/></svg>
+{%- elif nome == 'pagamento' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2.2"/><path d="M3 10.3h18M6.3 14.5h4"/></svg>
+{%- elif nome == 'checkin' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.3"/><path d="M8.2 12.3l2.6 2.6 5-5.4"/></svg>
+{%- elif nome == 'biblioteca' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.3"/><path d="M10 8.3l6 3.7-6 3.7V8.3z" fill="currentColor" stroke="none"/></svg>
+{%- elif nome == 'config' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.3"/><circle cx="12" cy="12" r="7.4"/><path d="M12 2.8v1.9M12 19.3v1.9M21.2 12h-1.9M4.7 12H2.8M18 6l-1.35 1.35M7.35 16.65L6 18M18 18l-1.35-1.35M7.35 7.35L6 6" stroke-width="2.4"/></svg>
+{%- elif nome == 'sino' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10a6 6 0 0 1 12 0c0 3.8 1.4 5.3 1.4 5.3H4.6S6 13.8 6 10z"/><path d="M10.2 19a2 2 0 0 0 3.6 0"/></svg>
+{%- elif nome == 'hamburguer' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+{%- elif nome == 'home' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.3L12 4l8 7.3"/><path d="M6 10.2V20h12v-9.8"/><path d="M10 20v-5.3h4V20"/></svg>
+{%- elif nome == 'home-cheio' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M4 11.3L12 4l8 7.3V20a1 1 0 0 1-1 1h-4.2v-6.4h-5.6V21H5a1 1 0 0 1-1-1V11.3z"/></svg>
+{%- elif nome == 'pessoa' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7.8" r="3.3"/><path d="M5 20c0-3.6 3.1-6.4 7-6.4s7 2.8 7 6.4"/></svg>
+{%- elif nome == 'seta-esquerda' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+{%- elif nome == 'perfil' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5.5 20c0-3.9 2.9-6.6 6.5-6.6s6.5 2.7 6.5 6.6"/></svg>
+{%- elif nome == 'sistema' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8 20h8M12 16.5V20"/></svg>
+{%- elif nome == 'seguranca' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l7 3.1v5.1c0 4.5-3 7.4-7 8.8-4-1.4-7-4.3-7-8.8V6.6l7-3.1z"/><path d="M9.3 12.1l1.8 1.8 3.6-3.9"/></svg>
+{%- elif nome == 'sair' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H5.8A1.8 1.8 0 0 0 4 5.8v12.4A1.8 1.8 0 0 0 5.8 20H9"/><path d="M15.5 16l4-4-4-4"/><path d="M19 12H9"/></svg>
+{%- elif nome == 'foto' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.3a1.6 1.6 0 0 1 1.6-1.6h1.9L8.7 4.8h6.6l1.2 1.9h1.9A1.6 1.6 0 0 1 20 8.3v9.1a1.6 1.6 0 0 1-1.6 1.6H5.6A1.6 1.6 0 0 1 4 17.4V8.3z"/><circle cx="12" cy="13" r="3.4"/></svg>
+{%- elif nome == 'seta-direita' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+{%- elif nome == 'grade' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="6.5" height="6.5" rx="1.4"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.4"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.4"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.4"/></svg>
+{%- elif nome == 'enviar' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
+{%- elif nome == 'microfone' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21M9 21h6"/></svg>
+{%- elif nome == 'camera-video' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6.5" width="12" height="11" rx="2.2"/><path d="M15 10.3l6-3.3v10l-6-3.3"/></svg>
+{%- elif nome == 'imagem' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.2"/><circle cx="8.7" cy="9.7" r="1.7"/><path d="M4 17l5.3-5.3a2 2 0 0 1 2.8 0L15 14.6M14 13.6l1.6-1.6a2 2 0 0 1 2.8 0L20.5 14"/></svg>
+{%- elif nome == 'play' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5.3v13.4a1 1 0 0 0 1.53.85l10.7-6.7a1 1 0 0 0 0-1.7l-10.7-6.7A1 1 0 0 0 8 5.3z"/></svg>
+{%- elif nome == 'pause' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6.5" y="5" width="4" height="14" rx="1"/><rect x="13.5" y="5" width="4" height="14" rx="1"/></svg>
+{%- elif nome == 'check-solo' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>
+{%- elif nome == 'check-duplo' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12.5l5 5L16 7"/><path d="M8.5 12.5l5 5L23.5 7"/></svg>
+{%- elif nome == 'fechar-x' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
+{%- elif nome == 'lixeira' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.8A1.3 1.3 0 0 1 10.3 3.5h3.4A1.3 1.3 0 0 1 15 4.8V7M6.5 7l.8 12.2A2 2 0 0 0 9.3 21h5.4a2 2 0 0 0 2-1.8L18 7"/></svg>
+{%- elif nome == 'grafico-pizza' -%}
+<svg class="icone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5H12V3.5z"/><path d="M15.5 3.9A8.5 8.5 0 0 1 20.1 8.5H12l3.5-4.6z"/></svg>
+{%- endif -%}
+{% endmacro %}

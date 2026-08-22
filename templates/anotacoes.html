@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Anotações{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar"><h2>Anotações</h2></div>
+
+  <form method="post" action="{{ url_for('anotacoes_novo') }}" class="card" style="max-width:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Nova anotação</label>
+    <textarea name="texto" placeholder="Registro rápido — ex: aluno relatou dor no ombro, trocar exercício X..." required></textarea>
+    <label>Relacionar a um aluno (opcional)</label>
+    <select name="aluno_id">
+      <option value="">— Anotação geral —</option>
+      {% for a in alunos %}<option value="{{ a.id }}" {{ 'selected' if filtro_aluno_id == a.id }}>{{ a.nome }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary">SALVAR ANOTAÇÃO</button>
+  </form>
+
+  <div class="abas-filtro">
+    <a href="{{ url_for('anotacoes') }}" class="{{ 'ativa' if not filtro_aluno_id }}">Todas</a>
+    {% for a in alunos %}
+      <a href="{{ url_for('anotacoes', aluno_id=a.id) }}" class="{{ 'ativa' if filtro_aluno_id == a.id }}">{{ a.nome }}</a>
+    {% endfor %}
+  </div>
+
+  {% if anotacoes %}
+    {% for n in anotacoes %}
+      <div class="item-lista-card" style="align-items:flex-start;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;width:100%;gap:10px;">
+          <div class="sub">{{ n.aluno_nome or 'Anotação geral' }} · {{ n.criado_em[:16]|replace('T',' ') }}{% if n.fixada %} · 📌 fixada{% endif %}</div>
+        </div>
+        <div style="font-size:13.5px;line-height:1.4;">{{ n.texto }}</div>
+        <div style="display:flex;gap:8px;width:100%;">
+          <form method="post" action="{{ url_for('anotacoes_fixar', anotacao_id=n.id) }}" style="flex:1;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline btn-sm" style="width:100%;margin:0;">{{ 'Desafixar' if n.fixada else '📌 Fixar' }}</button>
+          </form>
+          <form method="post" action="{{ url_for('anotacoes_excluir', anotacao_id=n.id) }}"
+                onsubmit="return confirm('Excluir esta anotação?');" style="flex:1;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline btn-sm" style="width:100%;margin:0;color:var(--danger);border-color:var(--danger);">Excluir</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state"><div class="empty-ic">📝</div><p>Nenhuma anotação ainda.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

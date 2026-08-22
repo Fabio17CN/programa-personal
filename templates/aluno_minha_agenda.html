@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Minha Agenda{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('aluno_area') }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>Minha Agenda</h2>
+  </div>
+
+  <div class="card" style="max-width:none;">
+    <div class="section-title" style="margin-top:0;">Próximos atendimentos</div>
+    {% if proximos %}
+      {% for a in proximos %}
+        <div class="item-lista-card" style="align-items:center;">
+          <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+            <span class="letra-badge" style="border-color:var(--primary);color:var(--primary);">{{ svg('agenda') }}</span>
+            <div style="min-width:0;">
+              <div class="titulo">{{ a.titulo or 'Atendimento' }}</div>
+              <div class="sub">{{ (a.data_hora or '')[:10] }} às {{ (a.data_hora or '')[11:16] }}{% if a.duracao_min %} · {{ a.duracao_min }} min{% endif %}</div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state"><div class="empty-ic">🗓️</div><p>Nenhum atendimento marcado por enquanto.</p></div>
+    {% endif %}
+
+    {% if anteriores %}
+      <div class="section-title" style="margin-top:22px;">Anteriores</div>
+      {% for a in anteriores %}
+        <div class="item-lista-card" style="align-items:center;opacity:0.7;">
+          <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+            <span class="letra-badge">{{ svg('agenda') }}</span>
+            <div style="min-width:0;">
+              <div class="titulo">{{ a.titulo or 'Atendimento' }}</div>
+              <div class="sub">{{ (a.data_hora or '')[:10] }} às {{ (a.data_hora or '')[11:16] }}</div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

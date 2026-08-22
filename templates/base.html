@@ -1,0 +1,304 @@
+{% from "_icons.html" import svg %}
+<!DOCTYPE html>
+<html lang="pt-br" class="{% if request.endpoint in ['login','criar_conta_escolha','cadastro_personal','aluno_criar_conta','recuperar_senha','aluno_area','anamnese_nova','aluno_anamnese_responder','mensagens_conversa','aluno_minhas_mensagens_conversa'] %}pagina-fixa{% elif session.get('personal_id') or session.get('aluno_id') %}pagina-fixa{% endif %}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>{% block title %}Personal Trainer{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <meta name="theme-color" content="#0A0806">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
+</head>
+<body class="{% if request.endpoint in ['login','criar_conta_escolha','cadastro_personal','aluno_criar_conta','recuperar_senha'] %}pagina-login-fixa{% elif request.endpoint == 'dashboard' and not termo %}pagina-painel-fixa{% elif request.endpoint == 'aluno_area' %}pagina-aluno-fixa{% elif request.endpoint in ['aluno_novo','aluno_editar','anamnese_nova','aluno_anamnese_responder'] %}pagina-cadastro-fixa{% elif request.endpoint in ['mensagens_conversa','aluno_minhas_mensagens_conversa'] %}pagina-chat-fixa{% elif session.get('personal_id') %}pagina-interna{% elif session.get('aluno_id') %}pagina-interna{% endif %}{% if session.get('aluno_id') %} sessao-aluno{% endif %}">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-wrap" id="flash-wrap">
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+      <script>
+        document.querySelectorAll('#flash-wrap .flash').forEach(function (el, i) {
+          setTimeout(function () { el.classList.add('flash-show'); }, 30 + i * 80);
+          setTimeout(function () {
+            el.classList.remove('flash-show');
+            setTimeout(function () { el.remove(); }, 300);
+          }, 4200 + i * 80);
+        });
+      </script>
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+
+  <script>
+    window.CSRF_TOKEN = "{{ csrf_token() }}";
+    // Toast flutuante reutilizável (ex: "as senhas não coincidem"),
+    // some sozinho depois de 3 segundos. Usa o mesmo visual dos avisos
+    // do servidor (.flash), só que disparado pelo JavaScript da página.
+    window.mostrarToast = function (mensagem, tipo) {
+      var wrap = document.getElementById('flash-wrap');
+      if (!wrap) {
+        wrap = document.createElement('div');
+        wrap.className = 'flash-wrap';
+        wrap.id = 'flash-wrap';
+        document.body.insertBefore(wrap, document.body.firstChild);
+      }
+      var el = document.createElement('div');
+      el.className = 'flash flash-' + (tipo || 'warning');
+      el.textContent = mensagem;
+      wrap.appendChild(el);
+      setTimeout(function () { el.classList.add('flash-show'); }, 20);
+      setTimeout(function () {
+        el.classList.remove('flash-show');
+        setTimeout(function () { el.remove(); }, 300);
+      }, 3000);
+    };
+  </script>
+
+  <script>
+    // "Olho mágico": em TODO campo de senha do sistema (login, cadastro do
+    // personal, ativação de conta do aluno, recuperar senha, trocar senha
+    // nas configurações etc.) aparece um botão de mostrar/ocultar a senha
+    // digitada — não precisa adicionar em cada tela, roda sozinho aqui.
+    (function () {
+      var ICONE_OLHO_ABERTO = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+      var ICONE_OLHO_FECHADO = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.06 21.06 0 0 1 5.16-6.06M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.06 21.06 0 0 1-2.68 3.68"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>';
+
+      function adicionarOlho(campo) {
+        if (campo.dataset.olhoAdicionado || !campo.parentNode) return;
+        campo.dataset.olhoAdicionado = '1';
+        var wrap = document.createElement('div');
+        wrap.className = 'campo-senha-wrap';
+        campo.parentNode.insertBefore(wrap, campo);
+        wrap.appendChild(campo);
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn-olho-senha';
+        btn.setAttribute('aria-label', 'Mostrar senha');
+        btn.tabIndex = -1;
+        btn.innerHTML = ICONE_OLHO_ABERTO;
+        wrap.appendChild(btn);
+        btn.addEventListener('click', function () {
+          var visivel = campo.type === 'text';
+          campo.type = visivel ? 'password' : 'text';
+          btn.innerHTML = visivel ? ICONE_OLHO_ABERTO : ICONE_OLHO_FECHADO;
+          btn.setAttribute('aria-label', visivel ? 'Mostrar senha' : 'Ocultar senha');
+        });
+      }
+
+      document.querySelectorAll('input[type=password]').forEach(adicionarOlho);
+    })();
+  </script>
+
+  {% if request.endpoint == 'login' %}
+  <script>
+    // Login errado: além do aviso no topo (".flash"), destaca o campo de
+    // senha em vermelho com um leve "balanço" pra chamar a atenção na
+    // hora — e já foca nele, limpo, pronto pra tentar de novo.
+    (function () {
+      var erroLogin = document.querySelector('.flash-error');
+      var campoSenha = document.querySelector('#form-login input[type=password]');
+      if (!erroLogin || !campoSenha) return;
+      campoSenha.classList.add('campo-invalido');
+      campoSenha.value = '';
+      campoSenha.focus();
+      campoSenha.addEventListener('input', function () {
+        campoSenha.classList.remove('campo-invalido');
+      }, { once: true });
+    })();
+  </script>
+  {% endif %}
+
+
+  {% if session.get('personal_id') %}
+  <nav class="bottom-nav">
+    <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' else '' }}">
+      <span class="ic">{{ svg('home-cheio') if request.endpoint == 'dashboard' else svg('home') }}</span>Painel
+    </a>
+    <a href="{{ url_for('alunos_lista') }}" class="{{ 'active' if request.endpoint in ['alunos_lista','aluno_perfil'] else '' }}">
+      <span class="ic">{{ svg('pessoa') }}</span>Alunos
+    </a>
+    <a href="{{ url_for('aluno_novo') }}" class="{{ 'active' if request.endpoint == 'aluno_novo' else '' }}">
+      <span class="fab-central">＋</span>
+    </a>
+    <a href="{{ url_for('agenda') }}" class="{{ 'active' if request.endpoint == 'agenda' else '' }}">
+      <span class="ic">{{ svg('agenda') }}</span>Agenda
+    </a>
+    <a href="{{ url_for('configuracoes') }}" class="{{ 'active' if request.endpoint == 'configuracoes' else '' }}">
+      <span class="ic">{{ svg('grade') }}</span>Mais
+    </a>
+  </nav>
+  {% elif session.get('aluno_id') %}
+  <nav class="bottom-nav">
+    <a href="{{ url_for('aluno_area') }}" class="{{ 'active' if request.endpoint == 'aluno_area' else '' }}">
+      <span class="ic">{{ svg('home-cheio') if request.endpoint == 'aluno_area' else svg('home') }}</span>Início
+    </a>
+    <a href="{{ url_for('aluno_meus_treinos') }}" class="{{ 'active' if request.endpoint in ['aluno_meus_treinos','aluno_treino_detalhe'] else '' }}">
+      <span class="ic">{{ svg('treino') }}</span>Treinos
+    </a>
+    <a href="{{ url_for('aluno_minhas_mensagens') }}" class="{{ 'active' if request.endpoint == 'aluno_minhas_mensagens' else '' }}">
+      <span class="fab-central">＋</span>
+    </a>
+    <a href="{{ url_for('aluno_minha_agenda') }}" class="{{ 'active' if request.endpoint == 'aluno_minha_agenda' else '' }}">
+      <span class="ic">{{ svg('agenda') }}</span>Agenda
+    </a>
+    <a href="{{ url_for('aluno_meu_perfil') }}" class="{{ 'active' if request.endpoint == 'aluno_meu_perfil' else '' }}">
+      <span class="ic">{{ svg('grade') }}</span>Mais
+    </a>
+  </nav>
+
+  <!-- Modal flutuante de anamnese: abre por cima da tela atual, edita e
+       salva automaticamente sem precisar navegar pra outra página. -->
+  <div class="modal-overlay modal-overlay-anamnese" id="modalAnamnese">
+    <div class="modal-janela-anamnese" role="dialog" aria-modal="true">
+      <div class="modal-anamnese-header">
+        <h3 class="modal-titulo" style="margin:0;">Minha Anamnese</h3>
+        <span class="modal-anamnese-status" id="statusAutosave">&nbsp;</span>
+        <button type="button" class="modal-anamnese-fechar" onclick="fecharModalAnamnese()" aria-label="Fechar">✕</button>
+      </div>
+      <div class="modal-anamnese-corpo" id="corpoModalAnamnese">
+        <p style="color:var(--subtext);font-size:13px;">Carregando...</p>
+      </div>
+      <div class="modal-anamnese-rodape">
+        <button type="button" class="btn btn-primary" id="btnConcluirAnamnese" onclick="concluirModalAnamnese()">Concluir</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var perguntasAtuais = [];
+      var timerAutosave = null;
+      var obsAbertas = {};
+
+      window.abrirModalAnamnese = function (ev) {
+        if (ev) ev.preventDefault();
+        document.getElementById('modalAnamnese').classList.add('aberto');
+        carregarAnamnese();
+      };
+      window.fecharModalAnamnese = function () {
+        document.getElementById('modalAnamnese').classList.remove('aberto');
+      };
+
+      function carregarAnamnese() {
+        var corpo = document.getElementById('corpoModalAnamnese');
+        corpo.innerHTML = '<p style="color:var(--subtext);font-size:13px;">Carregando...</p>';
+        obsAbertas = {};
+        fetch('{{ url_for("aluno_anamnese_modal_dados") }}')
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            perguntasAtuais = data.perguntas || [];
+            // Ponto de partida: pergunta que já tem observação salva começa
+            // com a caixinha aberta (pra revisão); as demais começam fechadas.
+            // Daqui pra frente, quem manda no aberto/fechado é o toque do
+            // aluno no botão — não fica reabrindo sozinha a cada resposta.
+            perguntasAtuais.forEach(function (item, idx) {
+              obsAbertas[idx] = !!(item.observacao && item.observacao.trim());
+            });
+            renderizarPerguntas();
+          })
+          .catch(function () {
+            corpo.innerHTML = '<p style="color:var(--danger);font-size:13px;">Não foi possível carregar. Tente novamente.</p>';
+          });
+      }
+
+      function renderizarPerguntas() {
+        var corpo = document.getElementById('corpoModalAnamnese');
+        corpo.innerHTML = '';
+        perguntasAtuais.forEach(function (item, idx) {
+          var linha = document.createElement('div');
+          linha.className = 'anamnese-linha';
+          var simAtivo = item.resposta === 'Sim' ? ' selecionado-sim' : '';
+          var naoAtivo = item.resposta === 'Não' ? ' selecionado-nao' : '';
+          var aberta = !!obsAbertas[idx];
+          linha.innerHTML =
+            '<div class="anamnese-linha-pergunta">' + item.pergunta + '</div>' +
+            '<div class="anamnese-linha-opcoes">' +
+              '<button type="button" class="btn-sim' + simAtivo + '" data-idx="' + idx + '" data-valor="Sim">Sim</button>' +
+              '<button type="button" class="btn-nao' + naoAtivo + '" data-idx="' + idx + '" data-valor="Não">Não</button>' +
+            '</div>' +
+            '<button type="button" class="anamnese-linha-obs-toggle" data-idx="' + idx + '">' + (aberta ? '📝 Ocultar observação' : '📝 Tem alguma coisa pra falar sobre isso?') + '</button>' +
+            '<textarea class="anamnese-linha-obs" data-idx="' + idx + '" placeholder="Escreva aqui..." style="' + (aberta ? '' : 'display:none;') + '">' + (item.observacao || '') + '</textarea>';
+          corpo.appendChild(linha);
+        });
+        corpo.querySelectorAll('.anamnese-linha-opcoes button').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var idx = parseInt(btn.getAttribute('data-idx'), 10);
+            perguntasAtuais[idx].resposta = btn.getAttribute('data-valor');
+            renderizarPerguntas();
+            agendarAutosave();
+          });
+        });
+        corpo.querySelectorAll('.anamnese-linha-obs-toggle').forEach(function (botaoToggle) {
+          botaoToggle.addEventListener('click', function () {
+            var idx = botaoToggle.getAttribute('data-idx');
+            var caixinha = corpo.querySelector('.anamnese-linha-obs[data-idx="' + idx + '"]');
+            var abrindo = !obsAbertas[idx];
+            obsAbertas[idx] = abrindo;
+            caixinha.style.display = abrindo ? '' : 'none';
+            botaoToggle.textContent = abrindo ? '📝 Ocultar observação' : '📝 Tem alguma coisa pra falar sobre isso?';
+            if (abrindo) caixinha.focus();
+          });
+        });
+        corpo.querySelectorAll('.anamnese-linha-obs').forEach(function (textarea) {
+          textarea.addEventListener('input', function () {
+            var idx = parseInt(textarea.getAttribute('data-idx'), 10);
+            perguntasAtuais[idx].observacao = textarea.value;
+            agendarAutosave();
+          });
+        });
+      }
+
+      function agendarAutosave() {
+        var status = document.getElementById('statusAutosave');
+        status.textContent = 'Salvando...';
+        clearTimeout(timerAutosave);
+        timerAutosave = setTimeout(function () {
+          fetch('{{ url_for("aluno_anamnese_modal_autosave") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
+            body: JSON.stringify({ respostas: perguntasAtuais }),
+          })
+            .then(function () { status.textContent = 'Salvo ✓'; })
+            .catch(function () { status.textContent = 'Não foi possível salvar'; });
+        }, 600);
+      }
+
+      window.concluirModalAnamnese = function () {
+        var status = document.getElementById('statusAutosave');
+        status.textContent = 'Enviando...';
+        fetch('{{ url_for("aluno_anamnese_modal_concluir") }}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
+          body: JSON.stringify({ respostas: perguntasAtuais }),
+        })
+          .then(function () {
+            status.textContent = 'Concluído ✓';
+            window.mostrarToast('Anamnese enviada! Seu personal foi avisado.', 'success');
+            setTimeout(fecharModalAnamnese, 900);
+          })
+          .catch(function () { status.textContent = 'Não foi possível enviar'; });
+      };
+    })();
+  </script>
+  {% endif %}
+
+  {% block scripts %}{% endblock %}
+
+  <script>
+    // Os avisos (ex: "usuário ou senha inválidos") somem sozinhos depois de
+    // alguns segundos, em vez de ficar preso no topo da tela.
+    document.querySelectorAll('.flash').forEach((el, i) => {
+      setTimeout(() => {
+        el.style.transition = 'opacity 0.5s ease';
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 500);
+      }, 4000 + i * 300);
+    });
+  </script>
+</body>
+</html>

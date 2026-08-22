@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+{% block title %}Avaliação Postural — {{ aluno.nome }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar"><h2>Avaliação Postural</h2></div>
+  {% if not modelo_ia_disponivel %}
+  <div class="alerta-postural" style="display:block;font-size:13px;margin-bottom:14px;">
+    ⚠️ <b>A detecção automática por IA ainda não está instalada neste servidor.</b><br>
+    A linha manual continua funcionando normalmente, mas para a IA analisar a foto sozinha,
+    peça para quem administra o servidor rodar, uma única vez, dentro da pasta <code>webapp_v2</code>:
+    <br><code>python baixar_modelo_ia.py</code><br>
+    Depois é só reiniciar o site. (Detalhes no arquivo LEIA-ME.md do projeto.)
+  </div>
+  {% endif %}
+  <p style="color:var(--subtext);font-size:13px;">
+    Tire as 4 fotos padrão (frente, lado direito, lado esquerdo e costas). Em cada uma você pode
+    desenhar a linha manualmente (toque e arraste), pedir para a IA detectar automaticamente o
+    alinhamento de ombros/quadril/cabeça/tronco e escrever sua própria observação profissional.
+  </p>
+  <p id="aviso-camera" class="aviso-ia" style="display:none;">
+    ⚠️ Este endereço não permite abrir a câmera diretamente pelo navegador (isso exige HTTPS).
+    O botão "Abrir câmera" vai usar o seletor de foto/câmera nativo do celular no lugar — funciona normalmente.
+  </p>
+
+  {% for tipo, label in [('frontal','Vista Frontal'), ('lateral_direita','Lado Direito'), ('lateral_esquerda','Lado Esquerdo'), ('costas','Vista de Costas')] %}
+  <div class="postura-block" data-tipo="{{ tipo }}" data-foto-id="">
+    <div class="camera-label">{{ label }}</div>
+    <video autoplay playsinline muted style="display:none;"></video>
+    <canvas style="display:none;"></canvas>
+    <img class="resultado-img" style="display:none;">
+    <input type="file" accept="image/*" capture="environment" class="input-foto-fallback" style="display:none;">
+
+    <div class="postura-actions">
+      <button type="button" class="btn btn-outline btn-sm btn-abrir">📷 Abrir câmera</button>
+      <button type="button" class="btn btn-primary btn-sm btn-capturar" style="display:none;">Capturar</button>
+      <button type="button" class="btn btn-outline btn-sm btn-desenhar" style="display:none;">✏️ Desenhar linha</button>
+      <button type="button" class="btn btn-outline btn-sm btn-limpar-linha" style="display:none;">Limpar linha</button>
+      <button type="button" class="btn btn-success btn-sm btn-salvar" style="display:none;">💾 Salvar foto</button>
+      <button type="button" class="btn btn-info btn-sm btn-auto" style="display:none;" {{ 'disabled' if not modelo_ia_disponivel }}>🤖 Detectar automaticamente</button>
+      <button type="button" class="btn btn-outline btn-sm btn-refazer" style="display:none;">Refazer</button>
+    </div>
+    <div class="angulos-info" style="display:none;"></div>
+    <div class="alerta-postural" style="display:none;"></div>
+    <ul class="diagnostico-ia" style="display:none;"></ul>
+
+    <div class="obs-postural-box" style="display:none;">
+      <label style="font-size:11.5px;">Observação do profissional (postura, assimetrias, o que notou nesta vista)</label>
+      <textarea class="ta-observacao" placeholder="Ex.: ombro direito visivelmente mais alto; suspeita de leve escoliose torácica; perna esquerda aparenta ser mais longa..." rows="3"></textarea>
+      <button type="button" class="btn btn-outline btn-sm btn-salvar-obs">💾 Salvar observação</button>
+      <span class="obs-status" style="font-size:11px;color:var(--subtext);margin-left:6px;"></span>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div id="parecerGeralBox" class="card" style="display:none;max-width:none;border:1.5px solid var(--primary);">
+    <h3 style="margin-top:0;color:var(--primary);">🤖 Parecer geral da IA (todas as vistas)</h3>
+    <div id="parecerGeralConteudo"></div>
+  </div>
+
+  <a href="{{ url_for('avaliacao_pdf', aluno_id=aluno.id, avaliacao_id=avaliacao.id) }}" class="btn btn-success">✅ FINALIZAR E VER PDF</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const URL_SALVAR = "{{ url_for('postural_salvar_foto', aluno_id=aluno.id, avaliacao_id=avaliacao.id) }}";
+const URL_AUTO_BASE = "{{ url_for('postural_deteccao_automatica', aluno_id=aluno.id, foto_id=0) }}".replace('/0/auto', '');
+const URL_OBS_BASE = "{{ url_for('postural_salvar_observacao', aluno_id=aluno.id, avaliacao_id=avaliacao.id, foto_id=0) }}".replace('/0/observacao', '');
+const URL_PARECER_GERAL = "{{ url_for('postural_parecer_geral', aluno_id=aluno.id, avaliacao_id=avaliacao.id) }}";
+const CSRF = "{{ csrf_token() }}";
+
+async function atualizarParecerGeral() {
+  const resp = await fetch(URL_PARECER_GERAL);
+  const data = await resp.json();
+  const box = document.getElementById('parecerGeralBox');
+  const conteudo = document.getElementById('parecerGeralConteudo');
+  if (!data.ok || !data.parecer) { box.style.display = 'none'; return; }
+
+  const p = data.parecer;
+  const corPorGravidade = {
+    'dentro do esperado': '#059669', 'leve': '#B45309', 'moderada': '#C2410C', 'acentuada': '#EF4444'
+  };
+  const cor = corPorGravidade[p.gravidade_final] || '#94A3B8';
+  let html = `<p style="color:${cor};font-weight:700;font-size:14px;">${p.veredito}</p>`;
+  html += `<p style="color:var(--subtext);font-size:12px;">Vistas analisadas: ${p.vistas_analisadas.length}/4`;
+  if (p.pontuacao_media !== null && p.pontuacao_media !== undefined) html += ` · Placar médio: ${p.pontuacao_media}/100`;
+  html += `</p>`;
+  if (p.sinais_corroborados && p.sinais_corroborados.length) {
+    html += '<p style="font-size:12.5px;margin-bottom:2px;"><b>Sinais confirmados em mais de uma foto:</b></p><ul>';
+    p.sinais_corroborados.forEach(s => { html += `<li style="color:${corPorGravidade[s.gravidade] || '#F8FAFC'};">${s.sinal} (${s.gravidade})</li>`; });
+    html += '</ul>';
+  }
+  conteudo.innerHTML = html;
+  box.style.display = 'block';
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// getUserMedia só funciona em contexto seguro (HTTPS ou localhost). Se o app
+// for acessado por um IP na rede local (ex: http://192.168.x.x:5000), o
+// navegador bloqueia a câmera silenciosamente ou sem essa API existir —
+// por isso caímos para um <input type="file" capture="environment">, que
+// abre a câmera nativa do celular mesmo sem HTTPS.
+const CAMERA_DISPONIVEL = window.isSecureContext &&
+  !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+
+if (!CAMERA_DISPONIVEL) {
+  const avisoCamera = document.getElementById('aviso-camera');
+  if (avisoCamera) avisoCamera.style.display = 'block';
+}
+
+document.querySelectorAll('.postura-block').forEach(block => {
+  const tipo = block.dataset.tipo;
+  const video = block.querySelector('video');
+  const canvas = block.querySelector('canvas');
+  const img = block.querySelector('.resultado-img');
+  const inputFallback = block.querySelector('.input-foto-fallback');
+  const ctx = canvas.getContext('2d');
+
+  const btnAbrir = block.querySelector('.btn-abrir');
+  const btnCapturar = block.querySelector('.btn-capturar');
+  const btnDesenhar = block.querySelector('.btn-desenhar');
+  const btnLimpar = block.querySelector('.btn-limpar-linha');
+  const btnSalvar = block.querySelector('.btn-salvar');
+  const btnAuto = block.querySelector('.btn-auto');
+  const btnRefazer = block.querySelector('.btn-refazer');
+  const angulosInfo = block.querySelector('.angulos-info');
+  const alertaBox = block.querySelector('.alerta-postural');
+  const diagnosticoBox = block.querySelector('.diagnostico-ia');
+  const obsBox = block.querySelector('.obs-postural-box');
+  const taObservacao = block.querySelector('.ta-observacao');
+  const btnSalvarObs = block.querySelector('.btn-salvar-obs');
+  const obsStatus = block.querySelector('.obs-status');
+
+  let stream = null;
+  let capturaOriginalDataUrl = null;
+  let desenhando = false;
+  let pontoInicial = null;
+
+  function mostrarCanvasComImagem(imagemEl) {
+    canvas.width = imagemEl.naturalWidth || imagemEl.videoWidth;
+    canvas.height = imagemEl.naturalHeight || imagemEl.videoHeight;
+    ctx.drawImage(imagemEl, 0, 0, canvas.width, canvas.height);
+    capturaOriginalDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    video.style.display = 'none';
+    canvas.style.display = 'block';
+    btnAbrir.style.display = 'none';
+    btnCapturar.style.display = 'none';
+    btnDesenhar.style.display = 'inline-block';
+    btnSalvar.style.display = 'inline-block';
+    btnRefazer.style.display = 'inline-block';
+  }
+
+  btnAbrir.addEventListener('click', async () => {
+    if (!CAMERA_DISPONIVEL) {
+      // Sem suporte a getUserMedia neste endereço/navegador: usa a câmera
+      // nativa via seletor de arquivo, que funciona em qualquer contexto.
+      inputFallback.click();
+      return;
+    }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      video.srcObject = stream;
+      video.style.display = 'block';
+      btnAbrir.style.display = 'none';
+      btnCapturar.style.display = 'inline-block';
+    } catch (err) {
+      if (err.name === 'NotAllowedError') {
+        alert('Permissão da câmera negada. Habilite o acesso à câmera nas configurações do navegador e tente novamente.');
+      } else if (err.name === 'NotFoundError') {
+        alert('Nenhuma câmera foi encontrada neste dispositivo.');
+      } else {
+        alert('Não foi possível acessar a câmera (' + err.message + '). Vamos usar o seletor de foto do celular.');
+      }
+      inputFallback.click();
+    }
+  });
+
+  inputFallback.addEventListener('change', () => {
+    const arquivo = inputFallback.files && inputFallback.files[0];
+    if (!arquivo) return;
+    const imagemTemp = new window.Image();
+    imagemTemp.onload = () => mostrarCanvasComImagem(imagemTemp);
+    imagemTemp.src = URL.createObjectURL(arquivo);
+  });
+
+  btnCapturar.addEventListener('click', () => {
+    mostrarCanvasComImagem(video);
+    if (stream) stream.getTracks().forEach(t => t.stop());
+  });
+
+  function coordsRelativas(evt) {
+    const rect = canvas.getBoundingClientRect();
+    const escalaX = canvas.width / rect.width;
+    const escalaY = canvas.height / rect.height;
+    const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+    const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+    return { x: (clientX - rect.left) * escalaX, y: (clientY - rect.top) * escalaY };
+  }
+
+  btnDesenhar.addEventListener('click', () => {
+    desenhando = !desenhando;
+    btnDesenhar.textContent = desenhando ? '✏️ Modo desenho ATIVO (toque e arraste)' : '✏️ Desenhar linha';
+    btnLimpar.style.display = 'inline-block';
+  });
+
+  function iniciarTraco(evt) { if (!desenhando) return; pontoInicial = coordsRelativas(evt); evt.preventDefault(); }
+  function finalizarTraco(evt) {
+    if (!desenhando || !pontoInicial) return;
+    const p2 = coordsRelativas(evt);
+    ctx.strokeStyle = '#3B82F6';
+    ctx.lineWidth = Math.max(3, canvas.width / 250);
+    ctx.beginPath();
+    ctx.moveTo(pontoInicial.x, pontoInicial.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+    pontoInicial = null;
+  }
+  canvas.addEventListener('mousedown', iniciarTraco);
+  canvas.addEventListener('mouseup', finalizarTraco);
+  canvas.addEventListener('touchstart', iniciarTraco);
+  canvas.addEventListener('touchend', finalizarTraco);
+
+  btnLimpar.addEventListener('click', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const im = new window.Image();
+    im.onload = () => ctx.drawImage(im, 0, 0);
+    im.src = capturaOriginalDataUrl;
+  });
+
+  btnRefazer.addEventListener('click', () => {
+    capturaOriginalDataUrl = null;
+    inputFallback.value = '';
+    canvas.style.display = 'none';
+    img.style.display = 'none';
+    btnDesenhar.style.display = 'none';
+    btnLimpar.style.display = 'none';
+    btnSalvar.style.display = 'none';
+    btnAuto.style.display = 'none';
+    btnRefazer.style.display = 'none';
+    btnAbrir.style.display = 'inline-block';
+  });
+
+  btnSalvar.addEventListener('click', async () => {
+    const imagemComLinha = canvas.toDataURL('image/jpeg', 0.85);
+    const fd = new FormData();
+    fd.append('csrf_token', CSRF);
+    fd.append('tipo', tipo);
+    fd.append('imagem_original', capturaOriginalDataUrl);
+    fd.append('imagem_com_linha', imagemComLinha);
+    btnSalvar.textContent = 'Salvando...';
+    const resp = await fetch(URL_SALVAR, { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (data.ok) {
+      block.dataset.fotoId = data.foto_id;
+      btnSalvar.textContent = '✔ Salvo';
+      btnAuto.style.display = 'inline-block';
+      obsBox.style.display = 'block';
+      // Dispara a detecção automática por IA assim que a foto é salva —
+      // o profissional não precisa clicar em mais nada para ver a linha traçada.
+      if (!btnAuto.disabled) {
+        btnAuto.click();
+      }
+    } else {
+      btnSalvar.textContent = '💾 Salvar foto';
+      alert('Erro ao salvar a foto.');
+    }
+  });
+
+  btnAuto.addEventListener('click', async () => {
+    const fotoId = block.dataset.fotoId;
+    if (!fotoId) { alert('Salve a foto primeiro.'); return; }
+    btnAuto.textContent = 'Detectando...';
+    const fd = new FormData();
+    fd.append('csrf_token', CSRF);
+    const resp = await fetch(`${URL_AUTO_BASE}/${fotoId}/auto`, { method: 'POST', body: fd });
+    const data = await resp.json();
+    btnAuto.textContent = '🤖 Detectar automaticamente';
+    if (!data.ok) {
+      angulosInfo.style.display = 'block';
+      angulosInfo.textContent = data.mensagem || 'Não foi possível detectar.';
+      return;
+    }
+    img.src = data.url_imagem;
+    img.style.display = 'block';
+    canvas.style.display = 'none';
+    angulosInfo.style.display = 'block';
+    let partes = [];
+    if (data.angulo_ombro !== null && data.angulo_ombro !== undefined) partes.push(`Ombro: ${data.angulo_ombro}°`);
+    if (data.angulo_quadril !== null && data.angulo_quadril !== undefined) partes.push(`Quadril: ${data.angulo_quadril}°`);
+    if (data.angulo_cabeca !== null && data.angulo_cabeca !== undefined) partes.push(`Cabeça: ${data.angulo_cabeca}°`);
+    if (data.desvio_tronco_pct !== null && data.desvio_tronco_pct !== undefined) partes.push(`Desvio do tronco: ${data.desvio_tronco_pct}%`);
+    if (data.cabeca_projetada_pct !== null && data.cabeca_projetada_pct !== undefined) partes.push(`Cabeça projetada: ${data.cabeca_projetada_pct}%`);
+    if (data.cotovelo_projetado_pct !== null && data.cotovelo_projetado_pct !== undefined) partes.push(`Braço projetado: ${data.cotovelo_projetado_pct}%`);
+    if (data.pontuacao !== null && data.pontuacao !== undefined) partes.push(`Placar: ${data.pontuacao}/100`);
+    angulosInfo.textContent = partes.join(' · ');
+    if (data.alerta) {
+      alertaBox.style.display = 'block';
+      alertaBox.textContent = data.alerta;
+    }
+    if (data.diagnostico && data.diagnostico.length) {
+      const corPorGravidade = {
+        'dentro do esperado': '#059669', 'leve': '#B45309', 'moderada': '#C2410C',
+        'acentuada': '#EF4444', 'resumo': '#F8FAFC', 'aviso': '#94A3B8'
+      };
+      diagnosticoBox.innerHTML = '';
+      data.diagnostico.forEach(ponto => {
+        const li = document.createElement('li');
+        if (typeof ponto === 'object' && ponto !== null) {
+          li.textContent = ponto.texto;
+          li.style.color = corPorGravidade[ponto.gravidade] || '#F8FAFC';
+          if (ponto.gravidade === 'resumo') li.style.fontWeight = '700';
+        } else {
+          li.textContent = ponto;
+        }
+        diagnosticoBox.appendChild(li);
+      });
+      diagnosticoBox.style.display = 'block';
+    }
+    atualizarParecerGeral();
+  });
+
+  btnSalvarObs.addEventListener('click', async () => {
+    const fotoId = block.dataset.fotoId;
+    if (!fotoId) { alert('Salve a foto primeiro.'); return; }
+    btnSalvarObs.textContent = 'Salvando...';
+    const fd = new FormData();
+    fd.append('csrf_token', CSRF);
+    fd.append('observacao', taObservacao.value);
+    const resp = await fetch(`${URL_OBS_BASE}/${fotoId}/observacao`, { method: 'POST', body: fd });
+    const data = await resp.json();
+    btnSalvarObs.textContent = '💾 Salvar observação';
+    obsStatus.textContent = data.ok ? '✔ observação salva' : 'erro ao salvar';
+    setTimeout(() => { obsStatus.textContent = ''; }, 3000);
+  });
+});
+</script>
+{% endblock %}

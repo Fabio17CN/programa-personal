@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Controle de Pagamentos{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar"><h2>Controle de Pagamentos</h2></div>
+
+  <details class="card-toggle">
+    <summary>Nova cobrança</summary>
+    <form method="post" action="{{ url_for('pagamentos_novo') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Aluno *</label>
+      <select name="aluno_id" required>
+        <option value="">Escolha o aluno...</option>
+        {% for a in alunos %}<option value="{{ a.id }}">{{ a.nome }}</option>{% endfor %}
+      </select>
+      <div class="row">
+        <div><label>Valor (R$) *</label><input type="text" name="valor" inputmode="decimal" placeholder="Ex: 150,00" required></div>
+        <div><label>Vencimento *</label><input type="date" name="vencimento" required></div>
+      </div>
+      <label>Descrição</label>
+      <input type="text" name="descricao" placeholder="Ex: Mensalidade de agosto">
+      <button type="submit" class="btn btn-primary">CRIAR COBRANÇA</button>
+    </form>
+  </details>
+
+  <div class="abas-filtro">
+    <a href="{{ url_for('pagamentos') }}" class="{{ 'ativa' if not filtro_status }}">Todos</a>
+    <a href="{{ url_for('pagamentos', status='pendente') }}" class="{{ 'ativa' if filtro_status == 'pendente' }}">Pendentes</a>
+    <a href="{{ url_for('pagamentos', status='atrasado') }}" class="{{ 'ativa' if filtro_status == 'atrasado' }}">Atrasados</a>
+    <a href="{{ url_for('pagamentos', status='pago') }}" class="{{ 'ativa' if filtro_status == 'pago' }}">Pagos</a>
+  </div>
+
+  {% if pagamentos %}
+    {% for pg in pagamentos %}
+      <div class="item-lista-card" style="align-items:flex-start;">
+        <div>
+          <div class="titulo">{{ pg.aluno_nome }}</div>
+          <div class="sub">
+            {{ pg.descricao or 'Mensalidade' }} · Vence {{ pg.vencimento }}
+            {% if pg.status == 'pago' and pg.pago_em %} · Pago em {{ pg.pago_em[:10] }}{% endif %}
+          </div>
+          <span class="status-chip status-{{ pg.status }}" style="margin-top:6px;display:inline-block;">{{ pg.status }}</span>
+        </div>
+        <div style="text-align:right;">
+          <div class="valor" style="display:block;margin-bottom:8px;">R$ {{ "%.2f"|format(pg.valor)|replace(".", ",") }}</div>
+          <div style="display:flex;gap:6px;">
+            {% if pg.status != 'pago' %}
+            <form method="post" action="{{ url_for('pagamentos_pagar', pagamento_id=pg.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-success btn-sm" style="margin:0;">Marcar pago</button>
+            </form>
+            {% endif %}
+            <form method="post" action="{{ url_for('pagamentos_excluir', pagamento_id=pg.id) }}"
+                  onsubmit="return confirm('Excluir esta cobrança?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn-icon-excluir" title="Excluir">🗑️</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state"><div class="empty-ic">💳</div><p>Nenhuma cobrança encontrada.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}{{ treino.nome_treino or 'Ficha de treino' }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('aluno_meus_treinos') }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>{{ treino.nome_treino or 'Ficha de treino' }}</h2>
+  </div>
+  <p style="color:var(--subtext);font-size:12.5px;margin:-10px 0 18px;">{{ (treino.data or '')[:10] }}</p>
+
+  {% if dias %}
+    {% for dia in dias %}
+      {% if dia.exercicios %}
+        <div class="section-title" style="margin-top:{{ '0' if loop.first else '22px' }};">
+          Treino "{{ dia.letra or 'A' }}"{% if dia.dia_semana %} — {{ dia.dia_semana }}{% endif %}{% if dia.grupo_muscular %} · {{ dia.grupo_muscular }}{% endif %}
+        </div>
+        {% for ex in dia.exercicios %}
+          <div class="card" style="max-width:none;margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;">
+              <strong style="color:var(--primary);">{{ ex.nome or 'Exercício' }}</strong>
+            </div>
+            <div style="display:flex;gap:16px;margin-top:6px;font-size:13px;color:var(--text);">
+              {% if ex.series %}<span>{{ ex.series }} séries</span>{% endif %}
+              {% if ex.reps %}<span>{{ ex.reps }} repetições</span>{% endif %}
+            </div>
+            {% if ex.obs %}
+              <p style="color:var(--subtext);font-size:12.5px;margin:8px 0 0;">{{ ex.obs }}</p>
+            {% endif %}
+            {% if ex.video %}
+              <a href="{{ ex.video }}" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;color:var(--primary);font-size:12.5px;font-weight:700;text-decoration:none;">▶ Ver vídeo do exercício</a>
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+  {% else %}
+    <div class="empty-state"><div class="empty-ic">🏋️</div><p>Essa ficha ainda não tem exercícios cadastrados.</p></div>
+  {% endif %}
+
+  {% if treino.observacoes %}
+    <div class="card" style="max-width:none;margin-top:6px;">
+      <strong style="color:var(--primary);">Observações do personal</strong>
+      <p style="color:var(--text);font-size:13.5px;margin:8px 0 0;">{{ treino.observacoes }}</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Minha Anamnese{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar"><h2>Sua Anamnese</h2></div>
+
+  <div class="card" style="max-width:none;">
+    <div class="wizard-progress" id="progresso">Pergunta 1 de {{ perguntas|length }}</div>
+
+    {% for p in perguntas %}
+    <div class="wizard-step {{ 'active' if loop.first else '' }}" data-index="{{ loop.index0 }}">
+      <div class="wizard-pergunta">{{ p }}</div>
+      <div class="wizard-opcoes">
+        <button type="button" class="btn-sim" onclick="responder({{ loop.index0 }}, 'Sim', this)">SIM</button>
+        <button type="button" class="btn-nao" onclick="responder({{ loop.index0 }}, 'Não', this)">NÃO</button>
+      </div>
+    </div>
+    {% endfor %}
+
+    <div class="wizard-nav">
+      <button type="button" class="btn btn-outline" id="btnVoltar" onclick="voltar()">Voltar</button>
+      <button type="button" class="btn btn-link" onclick="salvarRascunho()">Salvar rascunho e sair</button>
+    </div>
+  </div>
+
+  <form method="post" id="formAnamnese" style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="acao" id="acaoInput" value="enviar">
+    <input type="hidden" name="respostas_json" id="respostasJson">
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const total = {{ perguntas|length }};
+const perguntasTexto = {{ perguntas|tojson }};
+const respostasSalvas = {{ respostas_salvas|tojson }};
+let atual = 0;
+let respostas = new Array(total).fill(null);
+
+// Recupera o rascunho salvo anteriormente, se existir, e já marca os
+// botões correspondentes na tela.
+respostasSalvas.forEach((r, idx) => {
+  if (idx < total && r && r.resposta && r.resposta !== 'Não respondido') {
+    respostas[idx] = r.resposta;
+  }
+});
+
+function pintarSelecionadas() {
+  document.querySelectorAll('.wizard-step').forEach((step, idx) => {
+    if (respostas[idx]) {
+      const classe = respostas[idx] === 'Sim' ? 'selecionado-sim' : 'selecionado-nao';
+      const btns = step.querySelectorAll('.wizard-opcoes button');
+      btns.forEach(b => {
+        if ((respostas[idx] === 'Sim' && b.classList.contains('btn-sim')) ||
+            (respostas[idx] === 'Não' && b.classList.contains('btn-nao'))) {
+          b.classList.add(classe);
+        }
+      });
+    }
+  });
+}
+
+function mostrar(i) {
+  document.querySelectorAll('.wizard-step').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.wizard-step[data-index="${i}"]`).classList.add('active');
+  document.getElementById('progresso').textContent = `Pergunta ${i + 1} de ${total}`;
+  document.getElementById('btnVoltar').style.visibility = i === 0 ? 'hidden' : 'visible';
+}
+
+function responder(i, valor, btn) {
+  respostas[i] = valor;
+  const step = btn.closest('.wizard-step');
+  step.querySelectorAll('.wizard-opcoes button').forEach(b => b.classList.remove('selecionado-sim', 'selecionado-nao'));
+  btn.classList.add(valor === 'Sim' ? 'selecionado-sim' : 'selecionado-nao');
+  setTimeout(() => {
+    if (i + 1 < total) { atual = i + 1; mostrar(atual); }
+    else enviar();
+  }, 200);
+}
+
+function voltar() {
+  if (atual > 0) { atual -= 1; mostrar(atual); }
+}
+
+function montarPayload() {
+  return perguntasTexto.map((p, idx) => ({
+    pergunta: p,
+    resposta: respostas[idx] || 'Não respondido',
+    observacao: '',
+  }));
+}
+
+function enviar() {
+  document.getElementById('acaoInput').value = 'enviar';
+  document.getElementById('respostasJson').value = JSON.stringify(montarPayload());
+  document.getElementById('formAnamnese').submit();
+}
+
+function salvarRascunho() {
+  document.getElementById('acaoInput').value = 'rascunho';
+  document.getElementById('respostasJson').value = JSON.stringify(montarPayload());
+  document.getElementById('formAnamnese').submit();
+}
+
+pintarSelecionadas();
+mostrar(0);
+</script>
+{% endblock %}

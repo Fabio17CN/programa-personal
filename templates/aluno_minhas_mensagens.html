@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Mensagens{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar"><h2>Mensagens</h2></div>
+
+  <a href="{{ url_for('aluno_minhas_mensagens_conversa') }}" class="conversa-item">
+    <span class="conversa-avatar">
+      {% if personal and personal.foto_perfil %}
+        <img src="{{ url_for('servir_foto_personal_para_aluno', personal_id=personal.id, nome_arquivo=personal.foto_perfil|basename) }}" alt="Foto do personal">
+      {% else %}
+        {{ ((personal.nome_exibicao if personal else none) or (personal.usuario if personal else none) or '?')[0]|upper }}
+      {% endif %}
+    </span>
+    <span class="conversa-meio">
+      <span class="conversa-nome">{{ (personal.nome_exibicao if personal else none) or 'Seu personal' }}</span>
+      <span class="conversa-preview">
+        {% if ultima_msg %}
+          {% if ultima_msg.remetente == 'aluno' %}Você: {% endif -%}
+          {%- if ultima_msg.apagada -%}🚫 Mensagem apagada
+          {%- elif ultima_msg.tipo == 'audio' -%}🎤 Áudio
+          {%- elif ultima_msg.tipo == 'video' -%}🎥 Vídeo
+          {%- elif ultima_msg.tipo == 'imagem' -%}📷 Foto
+          {%- elif ultima_msg.tipo == 'relatorio_avaliacao' -%}📊 Relatório de avaliação
+          {%- else -%}{{ ultima_msg.texto[:42] }}{% if ultima_msg.texto|length > 42 %}…{% endif %}{%- endif -%}
+        {% else %}
+          Toque para iniciar conversa
+        {% endif %}
+      </span>
+    </span>
+    <span class="conversa-lado">
+      {% if ultima_msg %}<span class="conversa-hora">{{ (ultima_msg.enviado_em or '')[11:16] }}</span>{% endif %}
+      {% if nao_lidas %}<span class="conversa-badge">{{ nao_lidas }}</span>{% endif %}
+    </span>
+  </a>
+</div>
+{% endblock %}

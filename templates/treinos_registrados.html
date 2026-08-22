@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Treinos Registrados{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar"><h2>Treinos Registrados</h2></div>
+  <div class="section-title">{{ total }} ficha(s) de treino</div>
+
+  {% if treinos %}
+    {% for t in treinos %}
+      <a href="{{ url_for('treino_editar', aluno_id=t.aluno_id, treino_id=t.id) }}" class="item-lista-card" style="align-items:center;">
+        <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+          <span class="letra-badge" style="border-color:var(--primary);color:var(--primary);">{{ t.letra_principal or '?' }}</span>
+          <div style="min-width:0;">
+            <div class="titulo" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ t.nome_treino or 'Ficha de treino' }}</div>
+            <div class="sub">{{ t.aluno_nome }} · {{ t.data[:10] }}{% if t.n_exercicios %} · {{ t.n_exercicios }} exercício(s){% endif %}</div>
+          </div>
+        </div>
+        <span class="arrow" style="color:var(--primary);">›</span>
+      </a>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state"><div class="empty-ic">📋</div><p>Nenhuma ficha de treino registrada ainda.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Minhas Avaliações{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('aluno_area') }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>Minhas Avaliações</h2>
+  </div>
+  <div class="section-title">{{ avaliacoes|length }} avaliação(ões) registrada(s)</div>
+
+  <div class="card" style="max-width:none;">
+    {% if avaliacoes %}
+      {% for a in avaliacoes %}
+        <a href="{{ url_for('aluno_avaliacao_detalhe', avaliacao_id=a.id) }}" class="item-lista-card" style="align-items:center;">
+          <div style="min-width:0;">
+            <div class="titulo">{{ (a.data or '')[:10] }}</div>
+            <div class="sub">
+              {% if a.peso %}{{ a.peso }}kg{% endif %}
+              {% if a.imc %} · IMC {{ a.imc }}{% endif %}
+              {% if a.bf %} · {{ a.bf }}% gordura{% endif %}
+            </div>
+          </div>
+          <span class="arrow" style="color:var(--primary);">›</span>
+        </a>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state"><div class="empty-ic">📊</div><p>Seu personal ainda não registrou nenhuma avaliação física.</p></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

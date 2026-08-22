@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Configurações{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('dashboard') }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>Configurações</h2>
+  </div>
+
+  <div class="avatar-upload-block">
+    <label for="inputFotoPerfil" class="avatar-upload-circulo" id="avatarUploadCirculo" title="Toque para escolher uma foto">
+      {% if personal.foto_perfil %}
+        <img src="{{ url_for('servir_foto_personal', personal_id=personal.id, nome_arquivo=personal.foto_perfil) }}" alt="Sua foto" id="avatarUploadImg">
+      {% else %}
+        <span id="avatarUploadInicial">{{ (personal.nome_exibicao or personal.usuario or '?')[0]|upper }}</span>
+      {% endif %}
+      <span class="avatar-upload-lapis">{{ svg('foto') }}</span>
+    </label>
+    <input type="file" id="inputFotoPerfil" accept="image/*" style="display:none;">
+    <div class="avatar-upload-legenda" id="avatarUploadStatus">
+      {% if personal.foto_perfil %}Toque na foto para trocar{% else %}Toque para adicionar sua foto{% endif %}
+    </div>
+  </div>
+
+  <div class="settings-list">
+    <div class="settings-item" style="cursor:default;">
+      <span class="settings-item-ic">{{ svg('perfil') }}</span>
+      <span class="settings-item-texto">
+        <span class="settings-item-titulo">Perfil</span>
+        <span class="settings-item-sub">Dados que aparecem nos PDFs gerados</span>
+      </span>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="card" style="max-width:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <label>Nome de exibição (aparece como "Personal: ...")</label>
+    <input type="text" name="nome_exibicao" value="{{ personal.nome_exibicao or '' }}" placeholder="Ex: FABIO">
+
+    <label>Slogan da empresa</label>
+    <input type="text" name="slogan" value="{{ personal.slogan or '' }}" placeholder="Ex: Treinamento personalizado, resultado de verdade.">
+
+    <label>Telefone / WhatsApp</label>
+    <input type="text" name="telefone" value="{{ personal.telefone or '' }}" placeholder="Ex: 88981779865">
+
+    <label>Instagram</label>
+    <input type="text" name="instagram" value="{{ personal.instagram or '' }}" placeholder="Ex: @nael_menezes01">
+
+    <label>Registro CREF</label>
+    <input type="text" name="cref" value="{{ personal.cref or '' }}" placeholder="Ex: 012345-G/CE">
+    <p style="font-size:11.5px;color:var(--subtext);margin-top:-6px;">
+      Aparece no cabeçalho dos relatórios, dando o acabamento de laudo técnico assinado por um profissional registrado.
+    </p>
+
+    <label>Logo (aparece no cabeçalho dos PDFs)</label>
+    {% if personal.logo_path %}
+      <p style="font-size:12px;color:var(--subtext);">Logo atual já cadastrada — envie outra imagem para trocar.</p>
+    {% endif %}
+    <input type="file" name="logo" accept="image/*">
+
+    <label class="toggle-linha" style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;gap:12px;cursor:pointer;">
+      <span>
+        <span style="display:block;font-size:13.5px;font-weight:600;">Mostrar resultado automaticamente no relatório</span>
+        <span style="display:block;font-size:11.5px;color:var(--subtext);margin-top:2px;">Ao salvar as medidas de um aluno, pula direto para o relatório em PDF pronto, sem passar pela tela intermediária.</span>
+      </span>
+      <input type="checkbox" name="mostrar_resultado_auto" value="1" {{ 'checked' if personal.mostrar_resultado_auto }} style="width:20px;height:20px;flex-shrink:0;accent-color:var(--primary);">
+    </label>
+
+    <button type="submit" class="btn btn-primary" style="margin-top:16px;">SALVAR</button>
+  </form>
+
+  <div class="settings-list">
+    <div class="settings-item" style="cursor:default;">
+      <span class="settings-item-ic">🔒</span>
+      <span class="settings-item-texto">
+        <span class="settings-item-titulo">Segurança</span>
+        <span class="settings-item-sub">{{ personal.email or personal.usuario }} · ID de acesso {{ 'PT%04d' % personal.id }}</span>
+      </span>
+    </div>
+  </div>
+
+  <form method="post" action="{{ url_for('configuracoes_senha') }}" class="card" style="max-width:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Senha atual</label>
+    <input type="password" name="senha_atual" autocomplete="current-password" required>
+    <label>Nova senha</label>
+    <input type="password" name="senha_nova" autocomplete="new-password" required>
+    <label>Confirmar nova senha</label>
+    <input type="password" name="senha_nova2" autocomplete="new-password" required>
+    <p style="font-size:11.5px;color:var(--subtext);margin-top:-6px;">
+      Mínimo 8 caracteres, com letra maiúscula, minúscula e número. Ao trocar, você continua conectado aqui,
+      mas qualquer outro aparelho logado com essa conta será desconectado.
+    </p>
+    <button type="submit" class="btn btn-primary" style="margin-top:10px;">ALTERAR SENHA</button>
+    <a href="{{ url_for('logout') }}" class="btn-link" style="text-align:center;margin-top:10px;font-size:12px;">Esqueceu a senha atual? Sair e recuperar por e-mail</a>
+  </form>
+
+  <div class="settings-list">
+    <a href="{{ url_for('logout') }}" class="settings-item settings-item-perigo">
+      <span class="settings-item-ic">{{ svg('sair') }}</span>
+      <span class="settings-item-texto">
+        <span class="settings-item-titulo">Sair do sistema</span>
+      </span>
+      <span class="arrow">{{ svg('seta-direita') }}</span>
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Foto de perfil (avatar): assim que a pessoa escolhe a imagem, ela já é
+// enviada e salva sozinha — sem precisar apertar SALVAR nem recarregar a
+// página. Pode ser trocada de novo quantas vezes quiser, bastando tocar
+// na foto outra vez.
+(function () {
+  var input = document.getElementById('inputFotoPerfil');
+  var circulo = document.getElementById('avatarUploadCirculo');
+  var status = document.getElementById('avatarUploadStatus');
+  if (!input) return;
+
+  input.addEventListener('change', function () {
+    var arquivo = input.files && input.files[0];
+    if (!arquivo) return;
+
+    if (!arquivo.type || arquivo.type.indexOf('image/') !== 0) {
+      status.textContent = 'Escolha um arquivo de imagem.';
+      status.style.color = 'var(--danger)';
+      return;
+    }
+
+    circulo.classList.add('avatar-upload-enviando');
+    status.textContent = 'Enviando foto...';
+    status.style.color = 'var(--subtext)';
+
+    var dados = new FormData();
+    dados.append('foto', arquivo);
+    dados.append('csrf_token', '{{ csrf_token() }}');
+
+    fetch("{{ url_for('configuracoes_foto') }}", { method: 'POST', body: dados })
+      .then(function (resp) { return resp.json().then(function (json) { return { ok: resp.ok, json: json }; }); })
+      .then(function (r) {
+        circulo.classList.remove('avatar-upload-enviando');
+        if (!r.ok || !r.json.ok) {
+          status.textContent = (r.json && r.json.erro) || 'Não foi possível salvar a foto.';
+          status.style.color = 'var(--danger)';
+          return;
+        }
+        var inicial = document.getElementById('avatarUploadInicial');
+        var img = document.getElementById('avatarUploadImg');
+        if (inicial) inicial.remove();
+        if (!img) {
+          img = document.createElement('img');
+          img.id = 'avatarUploadImg';
+          img.alt = 'Sua foto';
+          circulo.insertBefore(img, circulo.querySelector('.avatar-upload-lapis'));
+        }
+        img.src = r.json.url;
+        status.textContent = 'Foto salva! Toque para trocar novamente.';
+        status.style.color = 'var(--success)';
+
+        // Atualiza também o avatar do topo do Painel, se essa tela ainda
+        // estiver aberta em outra aba/janela ao voltar pra ela.
+        var avatarTopo = document.querySelector('.avatar-topo');
+        if (avatarTopo) avatarTopo.innerHTML = '<img src="' + r.json.url + '" alt="Sua foto">';
+      })
+      .catch(function () {
+        circulo.classList.remove('avatar-upload-enviando');
+        status.textContent = 'Falha de conexão. Tente novamente.';
+        status.style.color = 'var(--danger)';
+      });
+  });
+})();
+</script>
+{% endblock %}

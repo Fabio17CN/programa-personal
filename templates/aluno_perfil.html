@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% block title %}{{ aluno.nome }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="profile-header">
+    <div class="avatar">
+      {% if aluno.foto_perfil %}
+        <img src="{{ url_for('servir_foto', aluno_id=aluno.id, nome_arquivo=aluno.foto_perfil|basename) }}" alt="Foto de {{ aluno.nome }}">
+      {% else %}
+        {{ aluno.nome[0]|upper }}
+      {% endif %}
+    </div>
+    <form method="post" action="{{ url_for('aluno_foto', aluno_id=aluno.id) }}" enctype="multipart/form-data" style="display:inline;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="avatar-upload-label">
+        📷 {{ 'Trocar foto' if aluno.foto_perfil else 'Adicionar foto de perfil' }}
+        <input type="file" name="foto_perfil" accept="image/*" style="display:none;" onchange="this.form.submit()">
+      </label>
+    </form>
+    <h2 style="margin:4px 0;">{{ aluno.nome }}</h2>
+    <div style="color:var(--subtext);font-size:13px;">
+      {{ aluno.academia or 'Academia não informada' }} · {{ aluno.idade or '-' }} anos
+    </div>
+    <div style="margin-top:8px;">
+      {% if aluno.objetivo %}<span class="chip">🎯 {{ aluno.objetivo }}</span>{% endif %}
+      {% if aluno.cidade %}<span class="chip">📍 {{ aluno.cidade }}{% if aluno.regiao %} - {{ aluno.regiao }}{% endif %}</span>{% endif %}
+      {% if aluno.telefone %}<span class="chip">📞 {{ aluno.telefone }}</span>{% endif %}
+      <span class="chip" style="{{ 'color:#4caf50;border-color:#4caf50;' if (aluno.status or 'Ativo') == 'Ativo' else 'color:var(--danger);border-color:var(--danger);' }}">
+        {{ '🟢 Ativo' if (aluno.status or 'Ativo') == 'Ativo' else '🔴 Inativo' }}
+      </span>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+      <a href="{{ url_for('aluno_editar', aluno_id=aluno.id) }}" class="btn-link" style="font-size:12.5px;">✏️ Editar dados</a>
+      {% if aluno.email and not aluno.conta_ativada %}
+      <form method="post" action="{{ url_for('aluno_reenviar_codigo', aluno_id=aluno.id) }}" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-link" style="font-size:12.5px;border:none;background:none;cursor:pointer;">📧 Reenviar código de acesso</button>
+      </form>
+      {% endif %}
+      <form method="post" action="{{ url_for('aluno_status', aluno_id=aluno.id) }}" style="display:inline;"
+            onsubmit="return confirm('{{ 'Marcar %s como inativo?' % aluno.nome if (aluno.status or 'Ativo') == 'Ativo' else 'Reativar %s?' % aluno.nome }}');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-link" style="font-size:12.5px;border:none;background:none;cursor:pointer;">
+          {{ '⏸ Marcar como inativo' if (aluno.status or 'Ativo') == 'Ativo' else '▶️ Reativar aluno' }}
+        </button>
+      </form>
+      <form method="post" action="{{ url_for('aluno_excluir', aluno_id=aluno.id) }}" style="display:inline;"
+            onsubmit="return confirm('Excluir {{ aluno.nome }} e todo o histórico? Essa ação não pode ser desfeita.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-link" style="font-size:12.5px;border:none;background:none;cursor:pointer;color:var(--danger);">🗑️ Excluir aluno</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-top:20px;">
+    <a href="{{ url_for('anamnese_nova', aluno_id=aluno.id) }}" class="btn btn-primary" style="margin:0;">📋 Nova Avaliação</a>
+    <a href="{{ url_for('treino_novo', aluno_id=aluno.id) }}" class="btn btn-info" style="margin:0;">📝 Novo Treino</a>
+  </div>
+
+  {% if anamnese_pendente %}
+    <div class="chip-status-anamnese chip-status-anamnese-pendente" style="margin-top:10px;">
+      🕓 Anamnese {{ 'em andamento — o aluno já começou a responder' if anamnese_pendente.status == 'em_andamento' else 'enviada — aguardando o aluno responder' }}
+    </div>
+  {% elif anamnese_respondida %}
+    <div class="chip-status-anamnese chip-status-anamnese-ok" style="margin-top:10px;">
+      ✅ Anamnese respondida em {{ (anamnese_respondida.data_resposta or anamnese_respondida.data or '')[:10] }}
+    </div>
+  {% endif %}
+
+  {% if comparativo %}
+  <div class="section-title">Comparativo de evolução (última x anterior)</div>
+  <div class="comparativo-card">
+    {% for item in comparativo %}
+      <div class="comparativo-item">
+        <span>{{ item.rotulo }}</span>
+        <span class="{{ 'valor-positivo' if item.positivo else 'valor-negativo' }}">
+          {{ '+' if item.diferenca > 0 else '' }}{{ item.diferenca }}{{ item.unidade }}
+          {{ '▲' if item.diferenca > 0 else '▼' }}
+        </span>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if avaliacoes|length >= 1 %}
+  <div class="aluno-item item-clicavel" style="margin-top:8px;"
+       data-nome="Relatorio_Completo_{{ aluno.nome }}.pdf"
+       data-url="{{ url_for('relatorio_completo_pdf', aluno_id=aluno.id) }}"
+       data-titulo="Relatório Completo">
+    <div>
+      <div class="nome">📄 Relatório Completo</div>
+      <div class="sub">Avaliação + fotos com análise de IA + treino, tudo junto</div>
+    </div>
+    <div class="arrow">›</div>
+  </div>
+  {% endif %}
+
+  {% if avaliacoes|length >= 1 %}
+  <div class="section-title">Evolução real</div>
+  <div class="chart-box chart-box-lg">
+    <div class="chart-legenda">
+      <span class="legenda-item"><i style="background:#3B82F6;"></i>Peso (kg)</span>
+      <span class="legenda-item"><i style="background:#10B981;"></i>BF (%)</span>
+    </div>
+    <div id="chartEvolucao" class="mini-chart mini-chart-lg"></div>
+  </div>
+  {% endif %}
+
+  {% if fotos %}
+  <div class="section-title">Última avaliação postural</div>
+  <div class="row" style="flex-wrap:wrap;">
+    {% for f in fotos %}
+      <div style="flex:1 1 100px;">
+        <img src="{{ url_for('servir_foto', aluno_id=aluno.id, nome_arquivo=(f.caminho_anotado or f.caminho_original)|basename) }}" style="width:100%;border-radius:10px;">
+        <div style="font-size:11px;color:var(--subtext);text-align:center;margin-top:4px;">{{ f.tipo }}</div>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="section-title">Histórico de avaliações ({{ avaliacoes|length }})</div>
+  {% if avaliacoes %}
+    <div class="timeline">
+      {% for a in avaliacoes|reverse %}
+      <div class="timeline-item">
+        <div class="timeline-dot" style="background:{{ ['#3B82F6','#F59E0B','#10B981','#8B5CF6','#EC4899'][loop.index0 % 5] }};"></div>
+        <div class="timeline-conteudo item-clicavel"
+             data-nome="Avaliacao_{{ aluno.nome }}_{{ a.data[:10] }}.pdf"
+             data-url="{{ url_for('avaliacao_pdf', aluno_id=aluno.id, avaliacao_id=a.id) }}"
+             data-titulo="Avaliação {{ a.data[:10] }}">
+          <div class="timeline-data">{{ a.data[:10] }}{% if loop.first %} <span class="chip" style="margin-left:6px;">mais recente</span>{% endif %}</div>
+          <div class="timeline-stats">Peso {{ a.peso or '-' }}kg · BF {{ a.bf or '-' }}% · IMC {{ a.imc or '-' }}</div>
+        </div>
+        <form method="post" action="{{ url_for('avaliacao_excluir', aluno_id=aluno.id, avaliacao_id=a.id) }}" class="form-excluir-item">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-icon-excluir" title="Excluir esta avaliação">🗑️</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state"><div class="empty-ic">📋</div><p>Nenhuma avaliação registrada ainda.</p></div>
+  {% endif %}
+
+  <div class="section-title">Treinos ({{ treinos|length }})</div>
+  {% if treinos %}
+    {% set cores_letra = {'A':'#F59E0B','B':'#8B5CF6','C':'#EC4899','D':'#10B981','E':'#3B82F6'} %}
+    {% for t in treinos %}
+    <div class="aluno-item" style="gap:10px;">
+      <div class="item-clicavel" style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;"
+           data-nome="Treino_{{ aluno.nome }}_{{ t.data[:10] }}.pdf"
+           data-url="{{ url_for('treino_pdf', aluno_id=aluno.id, treino_id=t.id) }}"
+           data-titulo="{{ t.nome_treino }}">
+        <span class="letra-badge" style="background:{{ cores_letra.get(t.letra_principal, '#3B82F6') }}22;color:{{ cores_letra.get(t.letra_principal, '#3B82F6') }};border-color:{{ cores_letra.get(t.letra_principal, '#3B82F6') }};">{{ t.letra_principal or '?' }}</span>
+        <div style="min-width:0;">
+          <div class="nome">{{ t.nome_treino }}</div>
+          <div class="sub">{{ t.data[:10] }}</div>
+        </div>
+      </div>
+      <a href="{{ url_for('treino_editar', aluno_id=aluno.id, treino_id=t.id) }}" class="btn-icon-editar" title="Editar esta ficha">✏️</a>
+      <form method="post" action="{{ url_for('treino_excluir', aluno_id=aluno.id, treino_id=t.id) }}" class="form-excluir-item">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-icon-excluir" title="Excluir esta ficha">🗑️</button>
+      </form>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state"><div class="empty-ic">📝</div><p>Nenhum treino registrado ainda.</p></div>
+  {% endif %}
+</div>
+
+<div class="modal-overlay" id="modalCompartilhar">
+  <div class="modal-janela">
+    <div class="modal-titulo" id="modalTitulo">—</div>
+    <button type="button" class="btn wa-btn" id="btnModalWhatsapp">📲 Compartilhar no WhatsApp</button>
+    <a class="btn btn-outline" id="btnModalBaixar" href="#">⬇️ Baixar PDF</a>
+    <button type="button" class="btn btn-link" id="btnModalFechar">Cancelar</button>
+    <p class="modal-aviso" id="modalAviso"></p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if avaliacoes|length >= 1 %}
+<script>
+// Gráfico combinado (peso + BF), em SVG puro — sem depender de CDN externo,
+// pra continuar funcionando mesmo sem internet no celular.
+function desenharGraficoEvolucao(containerId, labels, seriePeso, serieBf) {
+  const container = document.getElementById(containerId);
+  const w = 340, h = 210, padL = 8, padR = 8, padT = 18, padB = 26;
+
+  function prepararSerie(valores) {
+    const pares = labels.map((l, i) => [l, valores[i]]).filter(p => p[1] !== null && p[1] !== undefined);
+    if (pares.length === 0) return null;
+    const vals = pares.map(p => p[1]);
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const faixa = (max - min) || Math.max(1, max * 0.1) || 1;
+    const passoX = pares.length > 1 ? (w - padL - padR) / (pares.length - 1) : 0;
+    const pontos = pares.map((p, i) => {
+      const x = padL + i * passoX;
+      const y = padT + (h - padT - padB) - ((p[1] - min) / faixa) * (h - padT - padB);
+      return { x, y, valor: p[1], label: p[0] };
+    });
+    return pontos;
+  }
+
+  const pontosPeso = prepararSerie(seriePeso);
+  const pontosBf = prepararSerie(serieBf);
+
+  if (!pontosPeso && !pontosBf) {
+    container.innerHTML = '<div style="color:var(--subtext);font-size:12px;text-align:center;padding:40px 0;">Sem dados suficientes ainda.</div>';
+    return;
+  }
+
+  // Com só 1 avaliação registrada não dá pra desenhar uma linha de evolução
+  // (o ponto ficaria minúsculo, colado na borda) — mostra os valores atuais
+  // em destaque e explica que o gráfico aparece a partir da 2ª avaliação.
+  const totalPontos = Math.max(pontosPeso ? pontosPeso.length : 0, pontosBf ? pontosBf.length : 0);
+  const legendaEl = document.querySelector('.chart-legenda');
+  if (totalPontos < 2) {
+    if (legendaEl) legendaEl.style.display = 'none';
+    const ultimoPeso = pontosPeso ? pontosPeso[pontosPeso.length - 1].valor : null;
+    const ultimoBf = pontosBf ? pontosBf[pontosBf.length - 1].valor : null;
+    container.innerHTML = `
+      <div style="text-align:center;padding:18px 0 8px;">
+        <div style="display:flex;justify-content:center;gap:28px;">
+          ${ultimoPeso !== null ? `<div><div style="font-size:22px;font-weight:800;color:#3B82F6;">${ultimoPeso}<span style="font-size:12px;">kg</span></div><div style="font-size:10.5px;color:var(--subtext);">PESO ATUAL</div></div>` : ''}
+          ${ultimoBf !== null ? `<div><div style="font-size:22px;font-weight:800;color:#10B981;">${ultimoBf}<span style="font-size:12px;">%</span></div><div style="font-size:10.5px;color:var(--subtext);">BF ATUAL</div></div>` : ''}
+        </div>
+        <p style="color:var(--subtext);font-size:11.5px;margin:14px 0 0;">
+          Essa é a primeira avaliação registrada. O gráfico de evolução aparece
+          automaticamente a partir da 2ª avaliação.
+        </p>
+      </div>`;
+    return;
+  }
+
+  function caminhoSuave(pontos) {
+    if (pontos.length === 1) return `M ${pontos[0].x} ${pontos[0].y}`;
+    let d = `M ${pontos[0].x} ${pontos[0].y}`;
+    for (let i = 0; i < pontos.length - 1; i++) {
+      const p0 = pontos[i], p1 = pontos[i + 1];
+      const midX = (p0.x + p1.x) / 2;
+      d += ` C ${midX} ${p0.y}, ${midX} ${p1.y}, ${p1.x} ${p1.y}`;
+    }
+    return d;
+  }
+
+  function blocoSerie(pontos, cor, id) {
+    if (!pontos) return '';
+    const linha = caminhoSuave(pontos);
+    const area = `${linha} L ${pontos[pontos.length - 1].x} ${h - padB} L ${pontos[0].x} ${h - padB} Z`;
+    const circulos = pontos.map((p, i) => {
+      const destaque = i === pontos.length - 1;
+      return `<g>
+              <title>${p.label}: ${p.valor}</title>
+              <circle cx="${p.x}" cy="${p.y}" r="${destaque ? 4.5 : 3}" fill="${cor}" stroke="#0A0806" stroke-width="1.4"></circle>
+              <text x="${p.x}" y="${p.y - 10}" font-size="9.5" font-weight="700" fill="#F8FAFC" text-anchor="middle">${p.valor}</text>
+              </g>`;
+    }).join('');
+    return `
+      <defs><linearGradient id="grad-${id}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${cor}" stop-opacity="0.35"></stop>
+        <stop offset="100%" stop-color="${cor}" stop-opacity="0"></stop>
+      </linearGradient></defs>
+      <path d="${area}" fill="url(#grad-${id})" stroke="none"></path>
+      <path d="${linha}" fill="none" stroke="${cor}" stroke-width="2.6" stroke-linecap="round"></path>
+      ${circulos}`;
+  }
+
+  const baseRotulos = pontosPeso || pontosBf;
+  const rotulos = baseRotulos.map(p =>
+    `<text x="${p.x}" y="${h - 8}" font-size="9" fill="#94A3B8" text-anchor="middle">${(p.label || '').slice(5)}</text>`
+  ).join('');
+  const grades = [0.25, 0.5, 0.75].map(f => {
+    const y = padT + (h - padT - padB) * f;
+    return `<line x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}" stroke="#17130D" stroke-width="1"></line>`;
+  }).join('');
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:${h}px;">
+      ${grades}
+      ${blocoSerie(pontosPeso, '#3B82F6', 'peso')}
+      ${blocoSerie(pontosBf, '#10B981', 'bf')}
+      ${rotulos}
+    </svg>`;
+}
+
+fetch("{{ url_for('aluno_dados_json', aluno_id=aluno.id) }}")
+  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+  .then(d => {
+    try {
+      desenharGraficoEvolucao('chartEvolucao', d.labels, d.peso, d.bf);
+    } catch (erroDesenho) {
+      console.error('Erro ao desenhar gráfico de evolução:', erroDesenho);
+      document.getElementById('chartEvolucao').innerHTML =
+        '<div style="color:var(--subtext);font-size:12px;text-align:center;padding:24px 0;">Não foi possível desenhar o gráfico agora. Tente recarregar a página.</div>';
+    }
+  })
+  .catch(erro => {
+    console.error('Erro ao buscar dados de evolução:', erro);
+    document.getElementById('chartEvolucao').innerHTML =
+      '<div style="color:var(--subtext);font-size:12px;text-align:center;padding:24px 0;">Não foi possível carregar a evolução agora.</div>';
+  });
+</script>
+{% endif %}
+
+<script>
+// Confirmação antes de excluir avaliação/treino
+document.querySelectorAll('.form-excluir-item').forEach(form => {
+  form.addEventListener('submit', (evt) => {
+    if (!confirm('Excluir isso definitivamente? Não dá pra desfazer.')) evt.preventDefault();
+  });
+  form.addEventListener('click', (evt) => evt.stopPropagation());
+});
+
+// Janela (modal) de compartilhar/baixar PDF ao clicar num item do histórico
+const telefoneWa = "{{ aluno.telefone|telefone_whatsapp }}";
+const nomeAluno = {{ aluno.nome|tojson }};
+const temTelefone = {{ 'true' if aluno.telefone else 'false' }};
+
+const modal = document.getElementById('modalCompartilhar');
+const modalTitulo = document.getElementById('modalTitulo');
+const btnModalWhatsapp = document.getElementById('btnModalWhatsapp');
+const btnModalBaixar = document.getElementById('btnModalBaixar');
+const btnModalFechar = document.getElementById('btnModalFechar');
+const modalAviso = document.getElementById('modalAviso');
+
+function fecharModal() { modal.classList.remove('aberto'); modalAviso.textContent = ''; }
+btnModalFechar.addEventListener('click', fecharModal);
+modal.addEventListener('click', (evt) => { if (evt.target === modal) fecharModal(); });
+
+async function baixarComoArquivo(url, nomeArquivo) {
+  const resp = await fetch(url);
+  const blob = await resp.blob();
+  return new File([blob], nomeArquivo, { type: 'application/pdf' });
+}
+
+document.querySelectorAll('.item-clicavel').forEach(item => {
+  item.addEventListener('click', () => {
+    const url = item.dataset.url;
+    const nome = item.dataset.nome;
+    modalTitulo.textContent = item.dataset.titulo || 'Compartilhar';
+    btnModalBaixar.href = url;
+    btnModalWhatsapp.style.display = temTelefone ? 'block' : 'none';
+    if (!temTelefone) {
+      modalAviso.textContent = 'Cadastre o telefone do aluno no perfil pra liberar o envio direto por WhatsApp.';
+    }
+    btnModalWhatsapp.onclick = async () => {
+      const textoOriginal = btnModalWhatsapp.textContent;
+      btnModalWhatsapp.textContent = '...';
+      try {
+        const arquivo = await baixarComoArquivo(url, nome);
+        if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
+          await navigator.share({ files: [arquivo], title: nome, text: `Olá ${nomeAluno}, segue em anexo!` });
+          fecharModal();
+          return;
+        }
+        window.open(url, '_blank');
+        setTimeout(() => {
+          window.open(`https://wa.me/${telefoneWa}?text=${encodeURIComponent('Olá ' + nomeAluno + ', segue em anexo!')}`, '_blank');
+        }, 400);
+        modalAviso.textContent = window.isSecureContext
+          ? 'Este navegador não anexa automaticamente (funciona em Chrome/Safari atualizados no celular, com HTTPS). O PDF foi baixado — é só anexar na conversa que abriu.'
+          : 'O anexo automático só funciona com o site em HTTPS. O PDF foi baixado — é só anexar manualmente dessa vez.';
+      } catch (err) {
+        if (err.name !== 'AbortError') modalAviso.textContent = 'Não foi possível preparar o envio automático. Use "Baixar PDF" e anexe manualmente.';
+      } finally {
+        btnModalWhatsapp.textContent = textoOriginal;
+      }
+    };
+    modal.classList.add('aberto');
+  });
+});
+</script>
+{% endblock %}

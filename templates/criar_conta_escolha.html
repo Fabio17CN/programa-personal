@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Criar conta{% endblock %}
+{% block content %}
+<div class="center-screen login-bg">
+  <div class="login-glow"></div>
+  <div class="card login-card card-vidro">
+    <h1 class="brand brand-elegant" style="text-align:center;">CRIAR CONTA</h1>
+    <p style="text-align:center;color:var(--subtext);font-size:13.5px;margin:-6px 0 22px;">
+      Escolha o tipo de perfil para continuar
+    </p>
+
+    <a href="{{ url_for('cadastro_personal') }}" class="btn btn-primary" style="display:block;text-align:center;margin-bottom:12px;text-decoration:none;">
+      SOU PERSONAL TRAINER
+    </a>
+    <a href="{{ url_for('aluno_criar_conta') }}" class="btn" style="display:block;text-align:center;background:transparent;border:1.5px solid var(--primary);color:var(--primary);text-decoration:none;">
+      SOU ALUNO
+    </a>
+
+    <p style="text-align:center;color:var(--subtext);font-size:12px;margin-top:18px;line-height:1.5;">
+      Aluno: seu personal precisa ter cadastrado sua ficha antes. Você vai
+      precisar do e-mail que ele cadastrou e do código que enviamos para ele.
+    </p>
+
+    <a href="{{ url_for('login') }}" class="btn btn-link">Voltar</a>
+  </div>
+</div>
+{% endblock %}

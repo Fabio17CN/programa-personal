@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Notificações{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('dashboard') }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>Notificações</h2>
+  </div>
+
+  {% if notificacoes %}
+    <div class="settings-list">
+      {% for n in notificacoes %}
+        <div class="notificacao-item-linha">
+          <a href="{% if n.aluno_id %}{{ url_for('aluno_perfil', aluno_id=n.aluno_id) }}{% else %}{{ url_for('notificacoes') }}{% endif %}"
+             class="settings-item" style="text-decoration:none;flex:1;margin:0;">
+            <span class="settings-item-ic">{{ svg('sino') }}</span>
+            <span class="settings-item-texto">
+              <span class="settings-item-titulo">{{ n.mensagem }}</span>
+              <span class="settings-item-sub">{{ n.data[:16].replace('T', ' às ') }}</span>
+            </span>
+            <span class="arrow">›</span>
+          </a>
+          <form method="post" action="{{ url_for('notificacao_excluir', notificacao_id=n.id) }}"
+                onsubmit="return confirm('Excluir esta notificação?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn-excluir-rapido" title="Excluir notificação">🗑️</button>
+          </form>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card" style="max-width:none; text-align:center; color:var(--subtext);">
+      Nenhuma notificação por enquanto.
+    </div>
+  {% endif %}
+</div>
+
+<style>
+  .notificacao-item-linha { display: flex; align-items: stretch; gap: 8px; margin-bottom: 10px; }
+  .btn-excluir-rapido {
+    width: 46px; border: 1px solid var(--border); background: var(--card);
+    border-radius: 12px; color: var(--subtext); font-size: 16px; cursor: pointer;
+  }
+  .btn-excluir-rapido:hover { border-color: var(--danger); color: var(--danger); }
+</style>
+{% endblock %}
