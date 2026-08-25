@@ -1,0 +1,21 @@
+services:
+  personal-app:
+    build: .
+    container_name: personal_trainer_app
+    ports:
+      - "5000:5000"
+    # Lê TODAS as variáveis (SECRET_KEY, SMTP_*, etc.) direto do arquivo
+    # .env que fica ao lado deste docker-compose.yml. Assim as credenciais
+    # de e-mail ficam guardadas em um único lugar (o .env) e o compose usa
+    # exatamente o que estiver lá — sem precisar copiar/colar valores aqui.
+    env_file:
+      - .env
+    environment:
+      # Só o que NÃO está no .env (ou que você queira sobrescrever) fica aqui.
+      - PORT=5000
+    volumes:
+      # Sem esses volumes, o banco de dados e as fotos dos alunos seriam
+      # apagados toda vez que o container for reconstruído.
+      - ./instance:/app/instance
+      - ./uploads:/app/uploads
+    restart: unless-stopped

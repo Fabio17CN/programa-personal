@@ -1,0 +1,751 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}{{ "Editar Treino" if treino_existente else "Novo Treino" }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('treino_selecionar_aluno') }}" class="topbar-voltar" title="Voltar para busca de aluno">{{ svg('seta-esquerda') }}</a>
+  </div>
+
+  <div class="page-hero">
+    <div class="page-hero-row">
+      <div class="page-hero-ic">🏋️</div>
+      <div>
+        <h2>{{ "Editando treino de" if treino_existente else "Treino de" }} {{ aluno.nome }}</h2>
+        <p>Navegue entre os dias com as setas — só o dia selecionado fica aberto pra preencher.
+        Tudo fica salvo neste navegador automaticamente enquanto você {{ "ajusta" if treino_existente else "monta" }} a ficha.</p>
+      </div>
+    </div>
+    <span id="badge-rascunho" class="badge-rascunho" style="display:none;">💾 Salvo automaticamente</span>
+  </div>
+
+  <form method="post" class="card card-treino" style="max-width:none;" id="form-treino">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="campoNomeTreino">Nome da ficha</label>
+    <input type="text" id="campoNomeTreino" name="nome_treino" placeholder="Ex: Ficha de Treino — Julho/2026" required>
+
+    <div class="section-title" style="margin-top:16px;">📅 Dias de treino</div>
+
+    <div class="carrossel-dias">
+      <button type="button" id="btnPrevDia" class="btn-seta" title="Dia anterior" aria-label="Dia anterior">‹</button>
+      <div class="chips-dias" id="chipsDias"></div>
+      <button type="button" id="btnNextDia" class="btn-seta" title="Próximo dia" aria-label="Próximo dia">›</button>
+    </div>
+    <div class="progresso-dias" id="progressoDias"></div>
+
+    <div id="painelDia"></div>
+
+    <button type="button" id="btnAddDia" class="btn btn-outline btn-sm btn-add-dia">+ Adicionar outro dia</button>
+
+    <label for="campoObservacoes" style="margin-top:18px;">Observações gerais</label>
+    <textarea id="campoObservacoes" name="observacoes" placeholder="Ex: priorizar técnica antes de aumentar carga, evitar impacto no joelho direito…"></textarea>
+
+    <div class="resumo-ficha" id="resumoFicha"></div>
+
+    <div class="botoes-salvar-treino">
+      <button type="submit" name="acao" value="salvar" class="btn btn-outline">💾 Salvar</button>
+      <button type="submit" name="acao" value="salvar_pdf" class="btn btn-primary">⬇️ Baixar PDF</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.badge-rascunho {
+  display: inline-block;
+  font-size: 10px; color: var(--success); background: rgba(16,185,129,0.12);
+  border: 1px solid rgba(16,185,129,0.3); border-radius: 20px; padding: 3px 9px;
+  font-weight: 700; white-space: nowrap;
+  margin-top: 8px; position: relative; z-index: 1;
+}
+.card-treino {
+  box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+  border-top: 3px solid var(--primary);
+  animation: apareceCardTreino .25s ease;
+}
+@keyframes apareceCardTreino {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.card-treino label {
+  font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em;
+  color: var(--subtext); margin-bottom: 5px; display: block;
+}
+.card-treino > input[type="text"],
+.card-treino > textarea {
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.card-treino > input[type="text"]:focus,
+.card-treino > textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(58,110,178,0.18);
+  outline: none;
+}
+.card-treino > input[type="text"]:required:invalid.tocado {
+  border-color: var(--danger);
+}
+
+/* Campos de cada exercício (séries, repetições, descanso, carga) em grade
+   com rótulo próprio — antes eram só placeholders espremidos numa linha só. */
+.grade-campos-exercicio {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+.campo-exercicio label {
+  display: block; font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .02em; color: var(--subtext); margin-bottom: 4px;
+}
+.campo-exercicio input {
+  width: 100%; transition: border-color .15s ease, box-shadow .15s ease;
+}
+.campo-exercicio input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(58,110,178,0.18);
+  outline: none;
+}
+.campo-exercicio-largo { grid-column: 1 / -1; }
+
+.botoes-salvar-treino { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+.botoes-salvar-treino .btn { flex:1 1 160px; margin:0; font-weight:700; }
+.botoes-salvar-treino .btn-primary {
+  box-shadow: 0 10px 24px rgba(58,110,178,0.35);
+}
+
+.carrossel-dias { display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+.btn-seta {
+  background: var(--card-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 12px; width: 40px; height: 40px; font-size: 20px; flex: 0 0 auto; cursor: pointer;
+  transition: border-color .15s ease, transform .12s ease, background .15s ease;
+}
+.btn-seta:hover { border-color: var(--primary); background: rgba(58,110,178,0.1); }
+.btn-seta:active { transform: scale(0.92); }
+
+.chips-dias {
+  display:flex; gap:8px; overflow-x:auto; flex:1; padding:4px 2px 8px;
+  scroll-behavior: smooth; scrollbar-width: thin;
+}
+.chip-dia {
+  flex: 0 0 auto; min-width: 62px; text-align:center; padding: 9px 12px; border-radius: 13px;
+  border: 1px solid var(--border); background: var(--card-2); cursor: pointer; font-size: 12px;
+  transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+  position: relative;
+}
+.chip-dia:hover { border-color: var(--primary); transform: translateY(-1px); }
+.chip-dia.ativo {
+  background: linear-gradient(135deg, var(--primary-light), var(--primary) 55%, var(--primary-dark));
+  border-color: var(--primary); color:var(--on-primary); font-weight:700;
+  box-shadow: 0 8px 18px rgba(58,110,178,0.35); transform: translateY(-1px);
+}
+.chip-dia .letra { font-size: 17px; font-weight: 800; }
+.chip-dia .semana { font-size: 9.5px; color: var(--subtext); margin-top: 2px; white-space: nowrap; }
+.chip-dia.ativo .semana { color: rgba(245,248,252,0.8); }
+.chip-dia .selo-vazio {
+  position:absolute; top:-4px; right:-4px; width:9px; height:9px; border-radius:50%;
+  background: var(--warning); border:2px solid var(--bg, #060B14);
+}
+
+.progresso-dias { display:flex; justify-content:center; gap:6px; margin-bottom:16px; }
+.progresso-dias .ponto { width:6px; height:6px; border-radius:50%; background: var(--border); transition: background .15s ease, transform .15s ease; }
+.progresso-dias .ponto.ativo { background: var(--primary); transform: scale(1.3); }
+.progresso-dias .ponto.preenchido:not(.ativo) { background: var(--success); }
+
+.painel-dia-ativo {
+  border:1px solid var(--border); border-left: 3px solid var(--primary); border-radius: 16px; padding: 18px;
+  margin-bottom: 12px; background: var(--card-2);
+  animation: apareceCardTreino .18s ease;
+}
+.painel-dia-ativo label {
+  font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em;
+  color: var(--subtext); margin-bottom: 5px; display: block;
+}
+.painel-dia-ativo .row { display:flex; gap:10px; margin-bottom: 12px; }
+.campo-letra {
+  width: 100%; text-align: center; font-size: 20px; font-weight: 800;
+  color: var(--primary); border-color: var(--primary) !important;
+  background: rgba(58,110,178,0.08) !important;
+}
+.painel-dia-ativo input,
+.painel-dia-ativo select {
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.painel-dia-ativo input:focus,
+.painel-dia-ativo select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(58,110,178,0.18);
+  outline: none;
+}
+
+.linha-exercicio {
+  border:1px solid var(--border); border-radius:14px; margin-bottom:9px;
+  background: var(--card); transition: border-color .15s ease, box-shadow .15s ease; overflow:hidden;
+}
+.linha-exercicio:hover { border-color: var(--primary); }
+.linha-exercicio.aberta { border-color: var(--primary); box-shadow: 0 6px 18px rgba(58,110,178,0.12); }
+.linha-exercicio-header {
+  display:flex; align-items:center; gap:10px; padding:12px; cursor:pointer;
+}
+.linha-exercicio-num {
+  flex:0 0 auto; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  background: var(--card-2); border:1px solid var(--border); font-size:11.5px; font-weight:800; color: var(--subtext);
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.linha-exercicio.preenchida .linha-exercicio-num {
+  background: linear-gradient(135deg, var(--primary-light), var(--primary) 55%, var(--primary-dark));
+  color: var(--on-primary); border-color: var(--primary);
+}
+.linha-exercicio-resumo { flex:1; min-width:0; }
+.linha-exercicio-nome { font-size:13.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.linha-exercicio-sub { font-size:11px; color:var(--subtext); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.linha-exercicio-chevron { flex:0 0 auto; color:var(--subtext); font-size:12px; transition: transform .15s ease; }
+.linha-exercicio.aberta .linha-exercicio-chevron { transform: rotate(180deg); color: var(--primary); }
+.linha-exercicio-corpo {
+  padding: 4px 12px 14px; border-top:1px solid var(--border); margin-top:0;
+  animation: apareceCardTreino .15s ease;
+}
+.row-acoes-exercicio { display:flex; gap:8px; margin-top: 10px; flex-wrap: wrap; }
+.row-acoes-exercicio .btn { flex:1 1 auto; margin:0; }
+.btn-fechar-ex { color: var(--success) !important; border-color: rgba(16,185,129,0.35) !important; }
+.btn-duplicar-ex { color: var(--primary) !important; border-color: rgba(58,110,178,0.35) !important; }
+
+.item-sugestao-exercicio {
+  display:flex; align-items:center; gap:10px; padding:8px 10px; cursor:pointer;
+  border-radius: 10px; transition: background .12s ease;
+}
+.item-sugestao-exercicio:hover { background: rgba(58,110,178,0.1); }
+.item-sugestao-exercicio img { width:38px; height:38px; object-fit:cover; border-radius:8px; background:var(--card-2); flex:0 0 auto; }
+.item-sugestao-exercicio span { font-size: 12.5px; }
+.sugestoes-exercicio {
+  border: 1px solid var(--border); border-radius: 12px; background: var(--card-2);
+  max-height: 220px; overflow-y: auto; margin-bottom: 8px;
+}
+
+.resumo-ficha {
+  display: none; align-items: center; gap: 8px; margin-top: 16px;
+  font-size: 12px; color: var(--subtext); background: var(--card-2);
+  border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px;
+}
+.resumo-ficha.visivel { display: flex; }
+.resumo-ficha strong { color: var(--text); }
+.resumo-ficha.alerta { border-color: rgba(245,158,11,0.4); color: var(--warning); }
+.resumo-ficha.alerta strong { color: var(--warning); }
+
+.btn-add-dia, .btn-add-exercicio {
+  width: 100%; font-weight: 700;
+}
+</style>
+<script>
+const ALUNO_ID = {{ aluno.id }};
+const URL_INDICE_EXERCICIOS = "{{ url_for('static', filename='exercicios/exercises.json') }}";
+const URL_GIFS_BASE = "{{ url_for('static', filename='exercicios/gifs/') }}";
+const TREINO_ID = {{ (treino_id or '')|tojson }};
+const CHAVE_RASCUNHO = TREINO_ID ? `rascunho_treino_${ALUNO_ID}_${TREINO_ID}` : `rascunho_treino_${ALUNO_ID}_novo`;
+const DIAS_SEMANA = {{ dias_semana|tojson }};
+// Letras padrão pros primeiros dias — depois de "G" (7 dias, mais que
+// suficiente pra qualquer rotina semanal), continua o alfabeto (H, I, J…)
+// em vez de repetir sempre "X" pra todo dia extra, que fazia dois dias
+// diferentes ficarem com a mesma letra "X" se o personal adicionasse mais
+// de 8 dias.
+const LETRAS_PADRAO = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+function letraParaNovoDia(indice) {
+  if (indice < LETRAS_PADRAO.length) return LETRAS_PADRAO[indice];
+  return String.fromCharCode('H'.charCodeAt(0) + (indice - LETRAS_PADRAO.length));
+}
+const badgeRascunho = document.getElementById('badge-rascunho');
+
+// Quando é edição de uma ficha já salva, o servidor manda os dias prontos —
+// vira o ponto de partida se não houver rascunho mais recente no navegador.
+const DIAS_DO_SERVIDOR = {{ dias_existentes|tojson if treino_existente else 'null' }};
+const NOME_DO_SERVIDOR = {{ (treino_existente.nome_treino | tojson) if treino_existente else 'null' }};
+const OBSERVACOES_DO_SERVIDOR = {{ (treino_existente.observacoes | tojson) if treino_existente else 'null' }};
+
+// Cada dia guarda seus próprios dados em memória (não perde nada ao trocar de aba).
+let dias = [];
+let ativo = 0;
+let nomeTreino = '';
+let observacoesGerais = '';
+
+function converterDiaDoServidor(d) {
+  return {
+    letra: d.letra || '',
+    diaSemana: d.dia_semana || '',
+    grupo: d.grupo_muscular || '',
+    exercicios: (d.exercicios && d.exercicios.length)
+      ? d.exercicios.map(ex => ({
+          nome: ex.nome || '', series: ex.series || '', reps: ex.reps || '', descanso: ex.descanso || '',
+          obs: ex.obs || '', video: ex.video || '', gif: ex.gif || null,
+        }))
+      : [{ nome: '', series: '', reps: '', descanso: '', obs: '', video: '', gif: null }],
+  };
+}
+
+// Escapa texto digitado pelo personal antes de jogar em innerHTML/atributo —
+// sem isso, digitar aspas (") no nome de um exercício quebra o value="..."
+// e bagunça o formulário inteiro; e um "<" quebraria a tag renderizada.
+function escHtml(texto) {
+  const div = document.createElement('div');
+  div.textContent = texto == null ? '' : String(texto);
+  return div.innerHTML;
+}
+function escAttr(texto) {
+  return escHtml(texto).replace(/"/g, '&quot;');
+}
+
+// Mantém sempre pelo menos um exercício aberto (o próximo sem nome
+// preenchido) — evita que o personal role uma lista inteira fechada sem
+// saber onde continuar.
+function garantirAlgumAberto(exercicios) {
+  if (!exercicios.some(ex => ex._aberto)) {
+    const idxVazio = exercicios.findIndex(ex => !(ex.nome || '').trim());
+    exercicios[idxVazio !== -1 ? idxVazio : 0]._aberto = true;
+  }
+}
+
+// Resumo de uma linha (usado quando o exercício está recolhido), pra dar
+// pra ver série/repetição/GIF/vídeo sem precisar abrir de novo.
+function resumoExercicio(ex) {
+  const partes = [];
+  if (ex.series || ex.reps) partes.push(`${ex.series || '—'}×${ex.reps || '—'}`);
+  if (ex.descanso) partes.push(`⏱ ${ex.descanso}`);
+  if (ex.gif) partes.push('🎬 GIF');
+  if (ex.video) partes.push('🎥 vídeo');
+  return partes.length ? partes.join(' · ') : 'Toque para preencher';
+}
+
+function novoDia(letra) {
+  return { letra, diaSemana: '', grupo: '', exercicios: [{ nome: '', series: '', reps: '', descanso: '', obs: '', video: '', gif: null }] };
+}
+
+// Reconhece um link do YouTube (normal, encurtado ou "shorts") e devolve só o
+// ID do vídeo, pra poder montar o player embutido de prévia. Qualquer outro
+// link (Instagram, Drive etc.) continua funcionando como link normal, só
+// sem a prévia embutida.
+function idYoutube(url) {
+  if (!url) return null;
+  const m = String(url).match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
+// --- Biblioteca pública de exercícios (nome + GIF de demonstração) ---
+// Fonte: github.com/mohamedatef90/exercise-library (licença MIT, gratuito).
+// Cada exercício tem "name" (original, em inglês, usado só internamente
+// pra achar o GIF certo) e "name_pt" (tradução pro português, gerada com
+// um dicionário de termos de academia — é o que aparece pro personal na
+// busca e no nome do exercício preenchido automaticamente).
+// Carrega uma vez, direto do navegador do personal, e guarda em memória
+// pra sugerir enquanto ele digita o nome do exercício.
+let indiceExercicios = null;
+let carregandoIndiceExercicios = false;
+
+async function carregarIndiceExercicios() {
+  if (indiceExercicios || carregandoIndiceExercicios) return;
+  carregandoIndiceExercicios = true;
+  try {
+    const resp = await fetch(URL_INDICE_EXERCICIOS);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    indiceExercicios = await resp.json();
+  } catch (e) {
+    console.warn('Não foi possível carregar a biblioteca de exercícios (arquivo local ausente ou corrompido). A busca de GIF fica desativada, o resto do formulário funciona normal.', e);
+    indiceExercicios = [];
+  } finally {
+    carregandoIndiceExercicios = false;
+  }
+}
+carregarIndiceExercicios();
+
+let timeoutBuscaExercicio = null;
+async function buscarSugestoesExercicio(termo, container, aoEscolher) {
+  clearTimeout(timeoutBuscaExercicio);
+  const termoLimpo = (termo || '').trim().toLowerCase();
+  if (termoLimpo.length < 3) { container.style.display = 'none'; return; }
+  timeoutBuscaExercicio = setTimeout(async () => {
+    await carregarIndiceExercicios();
+    if (!indiceExercicios || !indiceExercicios.length) { container.style.display = 'none'; return; }
+    // Busca pelo nome em português (o que o personal está digitando), com
+    // o nome original em inglês como reforço — assim quem digitar um termo
+    // técnico em inglês por hábito (ex: "squat") também encontra.
+    const encontrados = indiceExercicios
+      .filter(ex => (ex.name_pt && ex.name_pt.toLowerCase().includes(termoLimpo)) ||
+                     (ex.name && ex.name.toLowerCase().includes(termoLimpo)))
+      .slice(0, 6);
+    if (!encontrados.length) { container.style.display = 'none'; return; }
+    container.innerHTML = encontrados.map((ex, idx) => `
+      <div class="item-sugestao-exercicio" data-idx="${idx}">
+        <img src="${URL_GIFS_BASE}${ex.gif}" loading="lazy">
+        <span>${ex.name_pt || ex.name}</span>
+      </div>
+    `).join('');
+    container.querySelectorAll('.item-sugestao-exercicio').forEach(el => {
+      el.addEventListener('click', () => aoEscolher(encontrados[parseInt(el.dataset.idx, 10)]));
+    });
+    container.style.display = 'block';
+  }, 300);
+}
+
+let salvarTimeout = null;
+function salvarRascunho() {
+  clearTimeout(salvarTimeout);
+  salvarTimeout = setTimeout(() => {
+    try {
+      localStorage.setItem(CHAVE_RASCUNHO, JSON.stringify({ nomeTreino, observacoesGerais, dias, ativo, quando: Date.now() }));
+      badgeRascunho.style.display = 'inline-block';
+    } catch (e) { /* localStorage indisponível — segue sem travar o app */ }
+    atualizarResumoFicha();
+  }, 400);
+}
+
+function carregarRascunho() {
+  try {
+    const bruto = localStorage.getItem(CHAVE_RASCUNHO);
+    if (!bruto) return false;
+    const dados = JSON.parse(bruto);
+    if (!dados.dias || !dados.dias.length) return false;
+    dias = dados.dias;
+    ativo = Math.min(dados.ativo || 0, dias.length - 1);
+    nomeTreino = dados.nomeTreino || '';
+    observacoesGerais = dados.observacoesGerais || '';
+    return true;
+  } catch (e) { return false; }
+}
+
+function limparRascunho() {
+  try { localStorage.removeItem(CHAVE_RASCUNHO); } catch (e) {}
+}
+
+// Total de exercícios com nome preenchido em toda a ficha (todos os dias),
+// usado pro resumo no rodapé e pra avisar antes de salvar uma ficha vazia.
+function contarExerciciosPreenchidos() {
+  return dias.reduce((soma, d) => soma + d.exercicios.filter(ex => (ex.nome || '').trim()).length, 0);
+}
+
+function atualizarResumoFicha() {
+  const el = document.getElementById('resumoFicha');
+  if (!el) return;
+  const diasComExercicio = dias.filter(d => d.exercicios.some(ex => (ex.nome || '').trim())).length;
+  const totalExercicios = contarExerciciosPreenchidos();
+  if (!totalExercicios) {
+    el.className = 'resumo-ficha visivel alerta';
+    el.innerHTML = '⚠️ Nenhum exercício preenchido ainda — adicione ao menos um antes de salvar.';
+    return;
+  }
+  el.className = 'resumo-ficha visivel';
+  el.innerHTML = `📋 <strong>${totalExercicios}</strong> exercício${totalExercicios === 1 ? '' : 's'} em <strong>${diasComExercicio}</strong> dia${diasComExercicio === 1 ? '' : 's'} de treino preenchido${diasComExercicio === 1 ? '' : 's'}.`;
+}
+
+function renderChips() {
+  const wrap = document.getElementById('chipsDias');
+  wrap.innerHTML = '';
+  dias.forEach((d, i) => {
+    const preenchido = d.exercicios.some(ex => (ex.nome || '').trim());
+    const chip = document.createElement('div');
+    chip.className = 'chip-dia' + (i === ativo ? ' ativo' : '');
+    chip.innerHTML = `<div class="letra">${escHtml(d.letra || '?')}</div><div class="semana">${escHtml(d.diaSemana || '—')}</div>${preenchido ? '' : '<span class="selo-vazio" title="Ainda sem exercícios"></span>'}`;
+    chip.addEventListener('click', () => { ativo = i; renderTudo(); });
+    wrap.appendChild(chip);
+  });
+}
+
+function renderPainel() {
+  const painel = document.getElementById('painelDia');
+  painel.innerHTML = '';
+  if (!dias.length) return;
+  const d = dias[ativo];
+
+  const box = document.createElement('div');
+  box.className = 'painel-dia-ativo';
+  box.innerHTML = `
+    <div class="row">
+      <div style="flex:1;">
+        <label>Letra do treino</label>
+        <input type="text" class="campo-letra" maxlength="2" value="${escAttr(d.letra)}" style="text-transform:uppercase;">
+      </div>
+      <div style="flex:2;">
+        <label>Dia da semana</label>
+        <select class="campo-semana">
+          <option value="">Sem dia fixo</option>
+          ${DIAS_SEMANA.map(ds => `<option value="${escAttr(ds)}" ${ds === d.diaSemana ? 'selected' : ''}>${escHtml(ds)}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <label>Grupo muscular (opcional)</label>
+    <input type="text" class="campo-grupo" placeholder="Ex: Peito e Tríceps" value="${escAttr(d.grupo)}">
+    <div class="section-title" style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;">
+      <span>Exercícios</span>
+      <span class="contador-exercicios" style="font-size:11px;color:var(--subtext);font-weight:600;"></span>
+    </div>
+    <div class="lista-exercicios"></div>
+    <button type="button" class="btn btn-outline btn-sm btn-add-exercicio">+ Adicionar exercício</button>
+    ${dias.length > 1 ? '<button type="button" class="btn btn-outline btn-sm btn-remover-dia" style="margin-top:8px;color:var(--danger);width:100%;">🗑 Remover este dia</button>' : ''}
+  `;
+
+  box.querySelector('.campo-letra').addEventListener('input', e => { d.letra = e.target.value.toUpperCase(); renderChips(); salvarRascunho(); });
+  box.querySelector('.campo-semana').addEventListener('change', e => { d.diaSemana = e.target.value; renderChips(); salvarRascunho(); });
+  box.querySelector('.campo-grupo').addEventListener('input', e => { d.grupo = e.target.value; salvarRascunho(); });
+
+  const listaEl = box.querySelector('.lista-exercicios');
+  const contadorEl = box.querySelector('.contador-exercicios');
+  garantirAlgumAberto(d.exercicios);
+
+  function renderExercicios() {
+    listaEl.innerHTML = '';
+    contadorEl.textContent = d.exercicios.length + (d.exercicios.length === 1 ? ' exercício' : ' exercícios');
+    d.exercicios.forEach((ex, i) => {
+      const linha = document.createElement('div');
+      const preenchida = !!(ex.nome || '').trim();
+      linha.className = 'linha-exercicio' + (ex._aberto ? ' aberta' : '') + (preenchida ? ' preenchida' : '');
+      linha.innerHTML = `
+        <div class="linha-exercicio-header">
+          <span class="linha-exercicio-num">${i + 1}</span>
+          <div class="linha-exercicio-resumo">
+            <div class="linha-exercicio-nome">${ex.nome ? escHtml(ex.nome) : 'Exercício ' + (i + 1)}</div>
+            <div class="linha-exercicio-sub">${escHtml(resumoExercicio(ex))}</div>
+          </div>
+          <span class="linha-exercicio-chevron">▾</span>
+        </div>
+        <div class="linha-exercicio-corpo" style="display:${ex._aberto ? 'block' : 'none'};">
+          <input type="text" class="campo-nome-exercicio" placeholder="Nome do exercício (ex: supino reto)" value="${escAttr(ex.nome)}" style="margin-bottom:2px;" autocomplete="off">
+          <div class="sugestoes-exercicio" style="display:none;"></div>
+          <div class="preview-gif-exercicio" style="display:${ex.gif ? 'flex' : 'none'};align-items:center;gap:8px;margin:6px 0;">
+            <img src="${ex.gif ? URL_GIFS_BASE + escAttr(ex.gif) : ''}" style="width:52px;height:52px;object-fit:cover;border-radius:8px;background:var(--card-2);">
+            <span style="font-size:11px;color:var(--subtext);">GIF de demonstração encontrado — vai junto no PDF</span>
+            <button type="button" class="btn-remover-gif" style="margin-left:auto;background:none;border:none;color:var(--danger);font-size:11px;cursor:pointer;">remover</button>
+          </div>
+          <div class="grade-campos-exercicio">
+            <div class="campo-exercicio">
+              <label>Séries</label>
+              <input type="text" placeholder="Ex: 3" value="${escAttr(ex.series)}">
+            </div>
+            <div class="campo-exercicio">
+              <label>Repetições</label>
+              <input type="text" placeholder="Ex: 12" value="${escAttr(ex.reps)}">
+            </div>
+            <div class="campo-exercicio">
+              <label>⏱ Descanso</label>
+              <input type="text" placeholder="Ex: 60s" value="${escAttr(ex.descanso || '')}">
+            </div>
+            <div class="campo-exercicio campo-exercicio-largo">
+              <label>Carga / observação</label>
+              <input type="text" placeholder="Ex: 20kg, pegada aberta" value="${escAttr(ex.obs)}">
+            </div>
+          </div>
+          <input type="url" class="campo-video-exercicio" placeholder="🎥 Link do vídeo do exercício (YouTube, opcional)" value="${escAttr(ex.video || '')}" style="margin-top:6px;">
+          <div class="preview-video-exercicio" style="display:none;margin-top:8px;"></div>
+          <div class="row-acoes-exercicio">
+            <button type="button" class="btn btn-outline btn-sm btn-fechar-ex">✓ Concluir e fechar</button>
+            <button type="button" class="btn btn-outline btn-sm btn-duplicar-ex">⧉ Duplicar</button>
+            <button type="button" class="btn btn-outline btn-sm btn-remover-ex" style="color:var(--danger);">🗑 Remover</button>
+          </div>
+        </div>
+      `;
+      const header = linha.querySelector('.linha-exercicio-header');
+      header.addEventListener('click', () => {
+        const abrindo = !ex._aberto;
+        if (abrindo) d.exercicios.forEach(outro => { outro._aberto = false; });
+        ex._aberto = abrindo;
+        renderExercicios();
+      });
+      const [inNome, inSeries, inReps, inDescanso, inObs, inVideo] = linha.querySelectorAll('input');
+      const boxSugestoes = linha.querySelector('.sugestoes-exercicio');
+      const previewGif = linha.querySelector('.preview-gif-exercicio');
+      const previewImg = previewGif.querySelector('img');
+      const previewVideo = linha.querySelector('.preview-video-exercicio');
+
+      function atualizarPreviewVideo(url) {
+        const ytId = idYoutube(url);
+        if (ytId) {
+          previewVideo.innerHTML = `
+            <img src="https://img.youtube.com/vi/${ytId}/mqdefault.jpg" style="width:96px;height:54px;object-fit:cover;border-radius:8px;display:block;">
+            <span style="font-size:11px;color:var(--success);font-weight:700;">✓ Vídeo do YouTube reconhecido — vai aparecer tocando direto na ficha do aluno</span>
+          `;
+          previewVideo.style.display = 'flex';
+          previewVideo.style.alignItems = 'center';
+          previewVideo.style.gap = '10px';
+        } else if (url) {
+          previewVideo.innerHTML = `<span style="font-size:11px;color:var(--subtext);">Link salvo — como não é do YouTube, vai aparecer como um botão de link na ficha do aluno.</span>`;
+          previewVideo.style.display = 'block';
+        } else {
+          previewVideo.style.display = 'none';
+        }
+      }
+      atualizarPreviewVideo(ex.video);
+      inVideo.addEventListener('input', e => { ex.video = e.target.value; atualizarPreviewVideo(ex.video); salvarRascunho(); });
+
+      inNome.addEventListener('input', e => {
+        ex.nome = e.target.value;
+        linha.querySelector('.linha-exercicio-nome').textContent = ex.nome || ('Exercício ' + (i + 1));
+        salvarRascunho();
+        buscarSugestoesExercicio(e.target.value, boxSugestoes, (encontrado) => {
+          const nomeEscolhido = encontrado.name_pt || encontrado.name;
+          ex.nome = nomeEscolhido;
+          ex.gif = encontrado.gif;
+          inNome.value = nomeEscolhido;
+          linha.querySelector('.linha-exercicio-nome').textContent = nomeEscolhido;
+          previewImg.src = `${URL_GIFS_BASE}${encontrado.gif}`;
+          previewGif.style.display = 'flex';
+          boxSugestoes.style.display = 'none';
+          salvarRascunho();
+        });
+      });
+      linha.querySelector('.btn-remover-gif').addEventListener('click', () => {
+        ex.gif = null;
+        previewGif.style.display = 'none';
+        salvarRascunho();
+      });
+      inSeries.addEventListener('input', e => { ex.series = e.target.value; salvarRascunho(); });
+      inReps.addEventListener('input', e => { ex.reps = e.target.value; salvarRascunho(); });
+      inDescanso.addEventListener('input', e => { ex.descanso = e.target.value; salvarRascunho(); });
+      inObs.addEventListener('input', e => { ex.obs = e.target.value; salvarRascunho(); });
+      linha.querySelector('.btn-fechar-ex').addEventListener('click', () => {
+        ex._aberto = false;
+        // Abre automaticamente o próximo exercício vazio, se houver — o
+        // personal segue preenchendo em sequência sem precisar tocar de novo.
+        const proximoVazio = d.exercicios.findIndex((outro, idx) => idx > i && !(outro.nome || '').trim());
+        if (proximoVazio !== -1) d.exercicios[proximoVazio]._aberto = true;
+        renderExercicios();
+        salvarRascunho();
+      });
+      linha.querySelector('.btn-duplicar-ex').addEventListener('click', () => {
+        // Duplica o exercício logo depois do original — útil pra bi-sets,
+        // drop-sets ou variações rápidas do mesmo movimento.
+        const copia = { nome: ex.nome, series: ex.series, reps: ex.reps, descanso: ex.descanso, obs: ex.obs, video: ex.video, gif: ex.gif, _aberto: false };
+        d.exercicios.splice(i + 1, 0, copia);
+        renderExercicios();
+        salvarRascunho();
+        if (window.mostrarToast) window.mostrarToast('Exercício duplicado', 'success');
+      });
+      linha.querySelector('.btn-remover-ex').addEventListener('click', () => {
+        // Só pede confirmação quando o exercício já tem algo preenchido —
+        // remover uma linha em branco continua instantâneo.
+        if (preenchida && !window.confirm(`Remover "${ex.nome || 'este exercício'}" da ficha?`)) return;
+        d.exercicios.splice(i, 1);
+        if (!d.exercicios.length) {
+          d.exercicios.push({ nome: '', series: '', reps: '', descanso: '', obs: '', video: '', gif: null, _aberto: true });
+        } else {
+          garantirAlgumAberto(d.exercicios);
+        }
+        renderExercicios();
+        salvarRascunho();
+      });
+      listaEl.appendChild(linha);
+    });
+  }
+  renderExercicios();
+
+  box.querySelector('.btn-add-exercicio').addEventListener('click', () => {
+    d.exercicios.forEach(ex => { ex._aberto = false; });
+    d.exercicios.push({ nome: '', series: '', reps: '', descanso: '', obs: '', video: '', gif: null, _aberto: true });
+    renderExercicios();
+    salvarRascunho();
+  });
+
+  const btnRemoverDia = box.querySelector('.btn-remover-dia');
+  if (btnRemoverDia) {
+    btnRemoverDia.addEventListener('click', () => {
+      // Remover um dia inteiro apaga todos os exercícios preenchidos nele
+      // de uma vez só — pede confirmação sempre que houver algo dentro
+      // (esse era o risco real: um toque sem querer podia apagar um dia
+      // inteiro de treino já preenchido, sem chance de desfazer).
+      const temConteudo = d.exercicios.some(ex => (ex.nome || '').trim());
+      if (temConteudo && !window.confirm(`Remover o dia "${d.letra || '?'}" e todos os exercícios dele?`)) return;
+      dias.splice(ativo, 1);
+      ativo = Math.max(0, ativo - 1);
+      renderTudo();
+      salvarRascunho();
+    });
+  }
+
+  painel.appendChild(box);
+}
+
+function renderProgresso() {
+  const wrap = document.getElementById('progressoDias');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  dias.forEach((d, i) => {
+    const preenchido = (d.exercicios || []).some(ex => (ex.nome || '').trim());
+    const ponto = document.createElement('span');
+    ponto.className = 'ponto' + (i === ativo ? ' ativo' : '') + (preenchido ? ' preenchido' : '');
+    wrap.appendChild(ponto);
+  });
+}
+
+function renderTudo() {
+  renderChips();
+  renderPainel();
+  renderProgresso();
+  atualizarResumoFicha();
+}
+
+document.getElementById('btnPrevDia').addEventListener('click', () => {
+  ativo = (ativo - 1 + dias.length) % dias.length;
+  renderTudo();
+  salvarRascunho();
+});
+document.getElementById('btnNextDia').addEventListener('click', () => {
+  ativo = (ativo + 1) % dias.length;
+  renderTudo();
+  salvarRascunho();
+});
+document.getElementById('btnAddDia').addEventListener('click', () => {
+  const letra = letraParaNovoDia(dias.length);
+  dias.push(novoDia(letra));
+  ativo = dias.length - 1;
+  renderTudo();
+  salvarRascunho();
+});
+
+const campoNome = document.getElementById('campoNomeTreino');
+const campoObs = document.getElementById('campoObservacoes');
+campoNome.addEventListener('input', e => { nomeTreino = e.target.value; salvarRascunho(); });
+campoNome.addEventListener('blur', () => campoNome.classList.add('tocado'));
+campoObs.addEventListener('input', e => { observacoesGerais = e.target.value; salvarRascunho(); });
+
+// Restaura o rascunho salvo neste navegador, se existir; senão usa a ficha já
+// salva no servidor (modo edição); senão começa com os 5 dias padrão (A a E).
+const tinhaRascunho = carregarRascunho();
+if (tinhaRascunho) {
+  badgeRascunho.style.display = 'inline-block';
+} else if (DIAS_DO_SERVIDOR && DIAS_DO_SERVIDOR.length) {
+  dias = DIAS_DO_SERVIDOR.map(converterDiaDoServidor);
+  nomeTreino = NOME_DO_SERVIDOR || '';
+  observacoesGerais = OBSERVACOES_DO_SERVIDOR || '';
+} else {
+  for (let i = 0; i < 5; i++) dias.push(novoDia(letraParaNovoDia(i)));
+}
+campoNome.value = nomeTreino;
+campoObs.value = observacoesGerais;
+renderTudo();
+
+document.getElementById('form-treino').addEventListener('submit', (evt) => {
+  // Ficha sem nenhum exercício preenchido em nenhum dia — deixa o
+  // personal confirmar antes de salvar algo em branco, em vez de só
+  // deixar seguir silenciosamente (fácil de acontecer sem perceber,
+  // principalmente se ele só ajustou o nome/observações e esqueceu de
+  // voltar pra preencher os exercícios).
+  if (!contarExerciciosPreenchidos() &&
+      !window.confirm('Essa ficha ainda não tem nenhum exercício preenchido. Salvar assim mesmo?')) {
+    evt.preventDefault();
+    return;
+  }
+  const form = evt.target;
+  dias.forEach(d => {
+    const exerciciosValidos = d.exercicios
+      .filter(ex => (ex.nome || '').trim())
+      .map(ex => ({
+        nome: ex.nome || '', series: ex.series || '', reps: ex.reps || '',
+        descanso: ex.descanso || '', obs: ex.obs || '', video: ex.video || '', gif: ex.gif || null,
+      }));
+    form.insertAdjacentHTML('beforeend', `
+      <input type="hidden" name="dia_letra" value="${escAttr((d.letra || '').trim())}">
+      <input type="hidden" name="dia_semana" value="${escAttr(d.diaSemana || '')}">
+      <input type="hidden" name="dia_grupo" value="${escAttr(d.grupo || '')}">
+      <input type="hidden" name="dia_exercicios_json" value='${JSON.stringify(exerciciosValidos).replace(/'/g, "&#39;")}'>
+    `);
+  });
+  // Só some o rascunho quando o envio realmente for pra frente (ficha salva de verdade).
+  limparRascunho();
+});
+</script>
+{% endblock %}

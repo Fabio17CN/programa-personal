@@ -1,0 +1,457 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Medidas — {{ aluno.nome }}{% endblock %}
+{% block content %}
+<div class="container container-wide">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('aluno_perfil', aluno_id=aluno.id) }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>Medidas — {{ aluno.nome }}</h2>
+  </div>
+
+  <div class="card calc-automatico" style="max-width:none;">
+    <div class="calc-cabecalho">
+      <div class="section-title" style="margin:0;">📊 Cálculo automático</div>
+      <span class="calc-status" id="calcStatus">Preencha os campos abaixo</span>
+    </div>
+    <div class="grid-calc">
+      <div class="calc-box" id="box-imc"><div class="calc-valor" id="out-imc">—</div><div class="calc-rotulo">IMC</div><div class="calc-classe" id="cls-imc"></div></div>
+      <div class="calc-box" id="box-bf"><div class="calc-valor" id="out-bf">—</div><div class="calc-rotulo">% Gordura (BF)</div><div class="calc-classe" id="cls-bf"></div></div>
+      <div class="calc-box"><div class="calc-valor" id="out-magra">—</div><div class="calc-rotulo">Massa Magra (kg)</div></div>
+      <div class="calc-box"><div class="calc-valor" id="out-gorda">—</div><div class="calc-rotulo">Massa Gorda (kg)</div></div>
+      <div class="calc-box" id="box-rcq"><div class="calc-valor" id="out-rcq">—</div><div class="calc-rotulo">RCQ</div><div class="calc-classe" id="cls-rcq"></div></div>
+      <div class="calc-box" id="box-rcest"><div class="calc-valor" id="out-rcest">—</div><div class="calc-rotulo">RCEst</div><div class="calc-classe" id="cls-rcest"></div></div>
+      <div class="calc-box" id="box-ic"><div class="calc-valor" id="out-ic">—</div><div class="calc-rotulo">Índice Conicidade</div><div class="calc-classe" id="cls-ic"></div></div>
+      <div class="calc-box"><div class="calc-valor" id="out-tmb">—</div><div class="calc-rotulo">TMB (kcal/dia)</div></div>
+    </div>
+
+    <!-- Composição: barra visual massa magra × massa gorda — mais fácil de
+         entender de relance do que só dois números soltos. -->
+    <div class="barra-composicao" id="barraComposicao" style="display:none;">
+      <div class="barra-composicao-preenchida" id="barraComposicaoPreenchida"></div>
+    </div>
+    <div class="barra-composicao-legenda" id="barraComposicaoLegenda" style="display:none;">
+      <span><i class="ponto-legenda ponto-magra"></i> Massa magra</span>
+      <span><i class="ponto-legenda ponto-gorda"></i> Massa gorda</span>
+    </div>
+
+    <!-- Peso ideal: faixa saudável de referência (IMC 18,5–24,9) + média de
+         5 fórmulas clássicas — não existia nenhuma referência de peso "alvo"
+         na tela, só os indicadores atuais soltos. -->
+    <div class="caixa-peso-ideal" id="caixaPesoIdeal" style="display:none;">
+      <div class="peso-ideal-titulo">⚖️ Peso ideal de referência</div>
+      <div class="peso-ideal-valor"><span id="pesoIdealMedia">—</span> kg</div>
+      <div class="peso-ideal-faixa">Faixa saudável (IMC 18,5–24,9): <strong id="pesoIdealFaixa">—</strong></div>
+    </div>
+
+    <p style="color:var(--subtext);font-size:11.5px;margin:10px 0 0;">
+      Calculado automaticamente (protocolo Jackson &amp; Pollock) assim que peso + dobras forem preenchidos.
+      O valor final oficial é recalculado pelo sistema ao salvar. Referências de faixa/risco são gerais — não substituem avaliação clínica.
+    </p>
+  </div>
+
+  <!-- Assimetria entre lados: compara braço, antebraço, coxa e panturrilha
+       D×E e avisa quando a diferença passa de 1cm — não existia nenhum
+       jeito de perceber isso de relance, e é um dado útil pro personal
+       ajustar o treino (ex: compensar um lado mais fraco). -->
+  <div class="card aviso-assimetria" id="avisoAssimetria" style="display:none;max-width:none;">
+    <div class="section-title" style="margin-top:0;">⚖️ Assimetria entre lados</div>
+    <div id="listaAssimetria"></div>
+  </div>
+
+  <form method="post" class="card" style="max-width:none;" id="form-medidas">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="section-title">Medidas gerais</div>
+    <div class="grid-medidas">
+      <div><label>Peso (kg)</label><input type="number" step="0.1" name="peso" id="in-peso" placeholder="Ex: 78.5" inputmode="decimal"></div>
+      <div><label>Altura (m)</label><input type="number" step="0.01" name="altura" id="in-altura" placeholder="Ex: 1.75" inputmode="decimal"></div>
+    </div>
+
+    <div class="section-title">Dobras cutâneas (mm)</div>
+    <p class="dica-secao">Preencha ao menos peitoral + abdominal + coxa (homens) ou tríceps + suprailíaca + coxa (mulheres) para o cálculo de % de gordura. Com as 7 preenchidas, o resultado fica mais preciso.</p>
+    <div class="grid-medidas grid-medidas-4">
+      <div><label>Peitoral</label><input type="number" step="0.1" name="dobra_peitoral" class="in-dobra" placeholder="0.0" inputmode="decimal"></div>
+      <div><label>Abdominal</label><input type="number" step="0.1" name="dobra_abdominal" class="in-dobra" placeholder="0.0" inputmode="decimal"></div>
+      <div><label>Coxa</label><input type="number" step="0.1" name="dobra_coxa" class="in-dobra" placeholder="0.0" inputmode="decimal"></div>
+      <div><label>Tríceps</label><input type="number" step="0.1" name="dobra_triceps" class="in-dobra" placeholder="0.0" inputmode="decimal"></div>
+      <div><label>Suprailíaca</label><input type="number" step="0.1" name="dobra_suprailiaca" class="in-dobra" placeholder="0.0" inputmode="decimal"></div>
+      <div><label>Axilar</label><input type="number" step="0.1" name="dobra_axilar" class="in-dobra" placeholder="0.0" inputmode="decimal"></div>
+      <div><label>Subescapular</label><input type="number" step="0.1" name="dobra_subescapular" class="in-dobra" placeholder="0.0" inputmode="decimal"></div>
+      <div><label>Bicipital <span class="dica-medida">(registro extra, não entra no cálculo)</span></label><input type="number" step="0.1" name="dobra_bicipital" class="in-dobra" placeholder="0.0" inputmode="decimal"></div>
+    </div>
+
+    <div class="section-title">Perímetros (cm)</div>
+
+    <div class="subsecao-segmento">🫀 Tronco</div>
+    <div class="grid-medidas grid-medidas-4">
+      <div><label>Ombro</label><input type="number" step="0.1" name="ombro" placeholder="0.0" inputmode="decimal"></div>
+      <div><label>Peito</label><input type="number" step="0.1" name="peito" placeholder="0.0" inputmode="decimal"></div>
+      <div><label>Quadril</label><input type="number" step="0.1" name="quadril" placeholder="0.0" inputmode="decimal"></div>
+    </div>
+
+    <div class="subsecao-segmento">📏 Cintura <span class="dica-medida">(no ponto mais estreito do abdômen, entre a última costela e a crista ilíaca — fita nivelada, sem apertar a pele)</span></div>
+    <div class="grid-medidas grid-medidas-4">
+      <div><label>Cintura</label><input type="number" step="0.1" name="cintura" placeholder="0.0" inputmode="decimal"></div>
+      <div><label>Abdome</label><input type="number" step="0.1" name="abdome" placeholder="0.0" inputmode="decimal"></div>
+    </div>
+
+    <div class="subsecao-segmento">💪 Braços</div>
+    <div class="grid-medidas grid-medidas-4">
+      <div><label>Braço direito</label><input type="number" step="0.1" name="braco_d" class="in-lado" data-par="braco" placeholder="0.0" inputmode="decimal"></div>
+      <div><label>Braço esquerdo</label><input type="number" step="0.1" name="braco_e" class="in-lado" data-par="braco" placeholder="0.0" inputmode="decimal"></div>
+      <div><label>Antebraço direito</label><input type="number" step="0.1" name="antebraco_d" class="in-lado" data-par="antebraco" placeholder="0.0" inputmode="decimal"></div>
+      <div><label>Antebraço esquerdo</label><input type="number" step="0.1" name="antebraco_e" class="in-lado" data-par="antebraco" placeholder="0.0" inputmode="decimal"></div>
+    </div>
+
+    <div class="subsecao-segmento">🦵 Pernas</div>
+    <div class="grid-medidas grid-medidas-4">
+      <div><label>Coxa direita</label><input type="number" step="0.1" name="coxa_d" class="in-lado" data-par="coxa" placeholder="0.0" inputmode="decimal"></div>
+      <div><label>Coxa esquerda</label><input type="number" step="0.1" name="coxa_e" class="in-lado" data-par="coxa" placeholder="0.0" inputmode="decimal"></div>
+      <div><label>Panturrilha direita</label><input type="number" step="0.1" name="panturrilha_d" class="in-lado" data-par="panturrilha" placeholder="0.0" inputmode="decimal"></div>
+      <div><label>Panturrilha esquerda</label><input type="number" step="0.1" name="panturrilha_e" class="in-lado" data-par="panturrilha" placeholder="0.0" inputmode="decimal"></div>
+    </div>
+
+    <label>Observações</label>
+    <textarea name="observacoes" placeholder="Ex: dificuldade de mobilidade no ombro direito, priorizar cuidado no treino de superiores…"></textarea>
+
+    <button type="submit" class="btn btn-success btn-ver-resultado">VER RESULTADO</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* --- Cabeçalho do painel de cálculo automático --- */
+.calc-cabecalho { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+.calc-status {
+  font-size: 10.5px; font-weight: 700; color: var(--subtext);
+  background: var(--card-2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 3px 10px;
+}
+.calc-status.pronto { color: var(--success); border-color: rgba(16,185,129,0.35); background: rgba(16,185,129,0.1); }
+
+/* --- Caixas de resultado: valor grande + rótulo + selo de classificação --- */
+.calc-box {
+  transition: border-color .2s ease, transform .2s ease;
+  position: relative;
+}
+.calc-box.preenchido { transform: translateY(-1px); }
+.calc-valor { transition: color .2s ease; }
+.calc-classe {
+  display: inline-block; margin-top: 5px; padding: 2px 8px; border-radius: 20px;
+  font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .3px;
+  background: var(--card); border: 1px solid var(--border); color: var(--subtext);
+}
+
+/* --- Barra de composição corporal (massa magra × massa gorda) --- */
+.barra-composicao {
+  height: 14px; border-radius: 20px; overflow: hidden; background: var(--card);
+  border: 1px solid var(--border); margin-top: 14px; display: flex;
+}
+.barra-composicao-preenchida {
+  height: 100%; background: linear-gradient(90deg, var(--success), #34D399);
+  transition: width .4s ease; border-radius: 20px 0 0 20px;
+}
+.barra-composicao-legenda { display: flex; gap: 16px; margin-top: 6px; font-size: 10.5px; color: var(--subtext); }
+.ponto-legenda { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; }
+.ponto-magra { background: var(--success); }
+.ponto-gorda { background: var(--card-2); border: 1px solid var(--border); }
+
+/* --- Peso ideal de referência --- */
+.caixa-peso-ideal {
+  margin-top: 14px; padding: 12px 14px; border-radius: 12px;
+  background: linear-gradient(135deg, rgba(58,110,178,0.12), rgba(58,110,178,0.04));
+  border: 1px solid rgba(58,110,178,0.3);
+}
+.peso-ideal-titulo { font-size: 11.5px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: .3px; }
+.peso-ideal-valor { font-size: 22px; font-weight: 800; color: var(--text); margin-top: 4px; }
+.peso-ideal-faixa { font-size: 11.5px; color: var(--subtext); margin-top: 2px; }
+.peso-ideal-faixa strong { color: var(--text); }
+
+/* --- Aviso de assimetria entre lados --- */
+.aviso-assimetria { border-left: 3px solid var(--warning); animation: apareceAssimetria .2s ease; }
+@keyframes apareceAssimetria { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.item-assimetria {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12.5px;
+}
+.item-assimetria:last-child { border-bottom: none; }
+.item-assimetria .dif {
+  font-weight: 800; color: var(--warning); background: rgba(245,158,11,0.12);
+  border-radius: 20px; padding: 2px 10px; font-size: 11.5px; white-space: nowrap;
+}
+
+/* --- Textos de apoio e campos --- */
+.dica-secao { color: var(--subtext); font-size: 11.5px; margin: -6px 0 12px; }
+.grid-medidas input, .card > textarea {
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.grid-medidas input:focus, .card > textarea:focus {
+  border-color: var(--primary); box-shadow: 0 0 0 3px rgba(58,110,178,0.16); outline: none;
+}
+.grid-medidas input:not(:placeholder-shown) {
+  border-color: rgba(58,110,178,0.4);
+}
+.btn-ver-resultado { width: 100%; margin-top: 18px; font-weight: 800; letter-spacing: .3px; }
+</style>
+<script>
+const SEXO_ALUNO = {{ (aluno.sexo or '')|tojson }};
+const IDADE_ALUNO = {{ (aluno.idade or 0)|tojson }};
+const HOMEM = !(SEXO_ALUNO || '').toLowerCase().startsWith('f');
+
+function num(id) {
+  const el = document.getElementById(id);
+  const v = el ? el.value : '';
+  return v === '' ? null : parseFloat(v);
+}
+function dobra(nome) {
+  const el = document.querySelector(`[name="${nome}"]`);
+  const v = el ? el.value : '';
+  return v === '' ? null : parseFloat(v);
+}
+
+// --- Classificações: espelham exatamente as mesmas faixas usadas pelo
+// servidor (calculos.py), pra essa prévia já mostrar a mesma leitura que
+// vai sair no relatório final, sem inventar limites diferentes aqui.
+function classificarImc(imc) {
+  if (imc == null) return null;
+  if (imc < 18.5) return 'Abaixo do peso';
+  if (imc < 25) return 'Peso normal';
+  if (imc < 30) return 'Sobrepeso';
+  if (imc < 35) return 'Obesidade grau I';
+  if (imc < 40) return 'Obesidade grau II';
+  return 'Obesidade grau III';
+}
+function classificarBf(bf) {
+  if (bf == null) return null;
+  const faixas = HOMEM
+    ? [[6, 'Muito baixo'], [13, 'Atlético'], [17, 'Bom'], [25, 'Aceitável'], [999, 'Elevado']]
+    : [[13, 'Muito baixo'], [20, 'Atlético'], [24, 'Bom'], [31, 'Aceitável'], [999, 'Elevado']];
+  for (const [limite, rotulo] of faixas) { if (bf < limite) return rotulo; }
+  return 'Elevado';
+}
+function classificarRcq(rcq) {
+  if (rcq == null) return null;
+  if (HOMEM) { if (rcq < 0.90) return 'Baixo risco'; if (rcq < 1.00) return 'Risco moderado'; return 'Risco alto'; }
+  if (rcq < 0.80) return 'Baixo risco'; if (rcq < 0.85) return 'Risco moderado'; return 'Risco alto';
+}
+function classificarRcest(rcest) {
+  if (rcest == null) return null;
+  if (rcest < 0.40) return 'Abaixo do esperado';
+  if (rcest < 0.50) return 'Saudável';
+  if (rcest < 0.60) return 'Risco aumentado';
+  return 'Risco alto';
+}
+function classificarIc(ic) {
+  if (ic == null) return null;
+  const limite = HOMEM ? 1.25 : 1.18;
+  if (ic < limite - 0.10) return 'Baixo risco';
+  if (ic < limite) return 'Risco moderado';
+  return 'Risco alto';
+}
+const COR_CLASSE = {
+  'Abaixo do peso': '#60A5FA', 'Peso normal': '#10B981', 'Sobrepeso': '#F59E0B',
+  'Obesidade grau I': '#F97316', 'Obesidade grau II': '#EF4444', 'Obesidade grau III': '#B91C1C',
+  'Muito baixo': '#60A5FA', 'Atlético': '#10B981', 'Bom': '#22C55E', 'Aceitável': '#F59E0B', 'Elevado': '#EF4444',
+  'Baixo risco': '#10B981', 'Risco moderado': '#F59E0B', 'Risco alto': '#EF4444',
+  'Abaixo do esperado': '#60A5FA', 'Saudável': '#10B981', 'Risco aumentado': '#F59E0B',
+};
+function pintarClasse(elId, rotulo) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (!rotulo) { el.textContent = ''; el.style.display = 'none'; return; }
+  el.textContent = rotulo;
+  el.style.display = 'inline-block';
+  const cor = COR_CLASSE[rotulo] || 'var(--subtext)';
+  el.style.color = cor;
+  el.style.borderColor = cor + '55';
+  el.style.background = cor + '18';
+}
+
+// --- Peso ideal: média das mesmas 5 fórmulas usadas no relatório oficial
+// (Lorentz, Devine, Robinson, Miller, Hamwi) + faixa saudável pelo IMC —
+// não existia nenhuma referência de peso "alvo" nessa tela antes.
+function calcularPesoIdeal(alturaM) {
+  if (!alturaM) return null;
+  const alturaCm = alturaM * 100;
+  const alturaIn = alturaCm / 2.54;
+  const mulher = !HOMEM;
+  const lorentz = mulher ? (alturaCm - 100 - (alturaCm - 150) / 2) : (alturaCm - 100 - (alturaCm - 150) / 4);
+  let devine, robinson, miller, hamwi;
+  if (alturaIn > 60) {
+    const exc = alturaIn - 60;
+    devine = mulher ? 45.5 + 2.3 * exc : 50.0 + 2.3 * exc;
+    robinson = mulher ? 49.0 + 1.7 * exc : 52.0 + 1.9 * exc;
+    miller = mulher ? 53.1 + 1.36 * exc : 56.2 + 1.41 * exc;
+    hamwi = mulher ? 45.5 + 2.2 * exc : 48.0 + 2.7 * exc;
+  } else {
+    [devine, robinson, miller, hamwi] = mulher ? [45.5, 49.0, 53.1, 45.5] : [50.0, 52.0, 56.2, 48.0];
+  }
+  const media = (lorentz + devine + robinson + miller + hamwi) / 5;
+  const alturaM2 = (alturaCm / 100) ** 2;
+  return { media: media.toFixed(1), min: (18.5 * alturaM2).toFixed(1), max: (24.9 * alturaM2).toFixed(1) };
+}
+
+function calcularComposicao() {
+  const peso = num('in-peso');
+  const altura = num('in-altura');
+  const idade = IDADE_ALUNO;
+
+  const outIMC = document.getElementById('out-imc');
+  const outBF = document.getElementById('out-bf');
+  const outMagra = document.getElementById('out-magra');
+  const outGorda = document.getElementById('out-gorda');
+
+  const imc = (peso != null && altura) ? (peso / (altura * altura)) : null;
+  outIMC.textContent = imc != null ? imc.toFixed(2) : '—';
+  document.getElementById('box-imc').classList.toggle('preenchido', imc != null);
+  pintarClasse('cls-imc', classificarImc(imc));
+
+  if (peso == null || !idade) {
+    outBF.textContent = '—'; outMagra.textContent = '—'; outGorda.textContent = '—';
+    pintarClasse('cls-bf', null);
+    document.getElementById('barraComposicao').style.display = 'none';
+    document.getElementById('barraComposicaoLegenda').style.display = 'none';
+    return;
+  }
+
+  const peitoral = dobra('dobra_peitoral'), axilar = dobra('dobra_axilar'), triceps = dobra('dobra_triceps');
+  const subescapular = dobra('dobra_subescapular'), abdominal = dobra('dobra_abdominal');
+  const suprailiaca = dobra('dobra_suprailiaca'), coxa = dobra('dobra_coxa');
+
+  let densidade = null;
+  const sete = [peitoral, axilar, triceps, subescapular, abdominal, suprailiaca, coxa];
+  if (sete.every(v => v !== null)) {
+    const soma = sete.reduce((a, b) => a + b, 0);
+    densidade = HOMEM
+      ? 1.112 - 0.00043499 * soma + 0.00000055 * soma * soma - 0.00028826 * idade
+      : 1.097 - 0.00046971 * soma + 0.00000056 * soma * soma - 0.00012828 * idade;
+  } else if (HOMEM && peitoral !== null && abdominal !== null && coxa !== null) {
+    const soma = peitoral + abdominal + coxa;
+    densidade = 1.10938 - 0.0008267 * soma + 0.0000016 * soma * soma - 0.0002574 * idade;
+  } else if (!HOMEM && triceps !== null && suprailiaca !== null && coxa !== null) {
+    const soma = triceps + suprailiaca + coxa;
+    densidade = 1.0994921 - 0.0009929 * soma + 0.0000023 * soma * soma - 0.0001392 * idade;
+  }
+
+  if (!densidade || densidade <= 0) {
+    outBF.textContent = '—'; outMagra.textContent = '—'; outGorda.textContent = '—';
+    pintarClasse('cls-bf', null);
+    document.getElementById('barraComposicao').style.display = 'none';
+    document.getElementById('barraComposicaoLegenda').style.display = 'none';
+    return;
+  }
+
+  let bf = (495 / densidade) - 450;
+  bf = Math.max(3, Math.min(60, bf));
+  const massaGorda = peso * bf / 100;
+  const massaMagra = peso - massaGorda;
+
+  outBF.textContent = bf.toFixed(1) + '%';
+  outGorda.textContent = massaGorda.toFixed(1);
+  outMagra.textContent = massaMagra.toFixed(1);
+  document.getElementById('box-bf').classList.add('preenchido');
+  pintarClasse('cls-bf', classificarBf(bf));
+
+  const barra = document.getElementById('barraComposicao');
+  const legenda = document.getElementById('barraComposicaoLegenda');
+  barra.style.display = 'flex';
+  legenda.style.display = 'flex';
+  document.getElementById('barraComposicaoPreenchida').style.width = Math.max(0, Math.min(100, (massaMagra / peso) * 100)) + '%';
+}
+
+function calcularIndicadoresExtra() {
+  const peso = num('in-peso');
+  const altura = num('in-altura');
+  const idade = IDADE_ALUNO;
+  const cintura = dobra('cintura');
+  const quadril = dobra('quadril');
+
+  const outRcq = document.getElementById('out-rcq');
+  const outRcest = document.getElementById('out-rcest');
+  const outIc = document.getElementById('out-ic');
+  const outTmb = document.getElementById('out-tmb');
+
+  const rcq = (cintura != null && quadril != null) ? (cintura / quadril) : null;
+  outRcq.textContent = rcq != null ? rcq.toFixed(2) : '—';
+  pintarClasse('cls-rcq', classificarRcq(rcq));
+
+  const rcest = (cintura != null && altura) ? (cintura / (altura * 100)) : null;
+  outRcest.textContent = rcest != null ? rcest.toFixed(3) : '—';
+  pintarClasse('cls-rcest', classificarRcest(rcest));
+
+  let ic = null;
+  if (peso != null && altura && cintura != null) {
+    ic = (cintura / 100) / (0.109 * Math.sqrt(peso / altura));
+    outIc.textContent = ic.toFixed(3);
+  } else {
+    outIc.textContent = '—';
+  }
+  pintarClasse('cls-ic', classificarIc(ic));
+
+  if (peso != null && altura && idade) {
+    const base = (10 * peso) + (6.25 * altura * 100) - (5 * idade);
+    const tmb = HOMEM ? base + 5 : base - 161;
+    outTmb.textContent = Math.round(tmb);
+  } else {
+    outTmb.textContent = '—';
+  }
+
+  const pesoIdeal = calcularPesoIdeal(altura);
+  const caixaPesoIdeal = document.getElementById('caixaPesoIdeal');
+  if (pesoIdeal) {
+    caixaPesoIdeal.style.display = 'block';
+    document.getElementById('pesoIdealMedia').textContent = pesoIdeal.media;
+    document.getElementById('pesoIdealFaixa').textContent = `${pesoIdeal.min} – ${pesoIdeal.max} kg`;
+  } else {
+    caixaPesoIdeal.style.display = 'none';
+  }
+
+  const algumPreenchido = [peso, altura, cintura, quadril].some(v => v != null);
+  const status = document.getElementById('calcStatus');
+  status.textContent = algumPreenchido ? '✓ Calculando com o que já foi preenchido' : 'Preencha os campos abaixo';
+  status.classList.toggle('pronto', algumPreenchido);
+}
+
+// --- Assimetria entre lados: compara cada par D×E e avisa quando a
+// diferença passa de 1cm — ajuda o personal a notar desequilíbrios sem
+// precisar comparar os números de cabeça.
+const ROTULOS_PAR = { braco: 'Braço', antebraco: 'Antebraço', coxa: 'Coxa', panturrilha: 'Panturrilha' };
+const LIMITE_ASSIMETRIA_CM = 1.0;
+function checarAssimetrias() {
+  const pares = ['braco', 'antebraco', 'coxa', 'panturrilha'];
+  const achados = [];
+  pares.forEach(par => {
+    const d = document.querySelector(`[name="${par}_d"]`);
+    const e = document.querySelector(`[name="${par}_e"]`);
+    const vd = d && d.value !== '' ? parseFloat(d.value) : null;
+    const ve = e && e.value !== '' ? parseFloat(e.value) : null;
+    if (vd == null || ve == null) return;
+    const diferenca = Math.round(Math.abs(vd - ve) * 10) / 10;
+    if (diferenca >= LIMITE_ASSIMETRIA_CM) {
+      const ladoMaior = vd > ve ? 'direito' : 'esquerdo';
+      achados.push({ rotulo: ROTULOS_PAR[par], diferenca, ladoMaior });
+    }
+  });
+  const card = document.getElementById('avisoAssimetria');
+  const lista = document.getElementById('listaAssimetria');
+  if (!achados.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  lista.innerHTML = achados.map(a => `
+    <div class="item-assimetria">
+      <span>${a.rotulo} — lado ${a.ladoMaior} maior</span>
+      <span class="dif">${a.diferenca.toFixed(1)} cm de diferença</span>
+    </div>
+  `).join('');
+}
+
+document.querySelectorAll('#form-medidas input').forEach(el => el.addEventListener('input', () => {
+  calcularComposicao();
+  calcularIndicadoresExtra();
+  checarAssimetrias();
+}));
+calcularComposicao();
+calcularIndicadoresExtra();
+checarAssimetrias();
+</script>
+{% endblock %}

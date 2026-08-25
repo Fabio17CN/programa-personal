@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Relatórios Avançados{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('dashboard') }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>Relatórios Avançados</h2>
+  </div>
+  <p style="font-size:12px;color:var(--subtext);margin-top:-8px;">Últimos 30 dias</p>
+
+  <div class="resumo-dia-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:18px;">
+    <div class="calc-box"><div class="calc-valor">{{ total_alunos }}</div><div class="calc-rotulo">Alunos ativos</div></div>
+    <div class="calc-box"><div class="calc-valor">{{ total_treinos }}</div><div class="calc-rotulo">Fichas de treino</div></div>
+    <div class="calc-box"><div class="calc-valor">{{ total_novos_30d }}</div><div class="calc-rotulo">Novos alunos (30d)</div></div>
+    <div class="calc-box"><div class="calc-valor">{{ total_checkins_30d }}</div><div class="calc-rotulo">Check-ins (30d)</div></div>
+  </div>
+
+  <div class="resumo-dia" style="margin-bottom:18px;">
+    <div class="resumo-dia-titulo">Financeiro deste mês</div>
+    <div class="resumo-dia-grid" style="grid-template-columns:repeat(3,1fr);">
+      <div class="resumo-dia-item"><div class="num" style="color:#34D399;">R$ {{ "%.0f"|format(resumo_mes.receitas) }}</div><div class="lbl">Receitas</div></div>
+      <div class="resumo-dia-item"><div class="num" style="color:#F87171;">R$ {{ "%.0f"|format(resumo_mes.despesas) }}</div><div class="lbl">Despesas</div></div>
+      <div class="resumo-dia-item"><div class="num">R$ {{ "%.0f"|format(resumo_mes.saldo) }}</div><div class="lbl">Saldo</div></div>
+    </div>
+  </div>
+
+  <div class="section-title">Receitas x Despesas por dia</div>
+  <div class="chart-box"><div id="chartFinanceiro" class="mini-chart"></div></div>
+
+  <div class="section-title">Novos alunos por dia</div>
+  <div class="chart-box"><div id="chartAlunos" class="mini-chart"></div></div>
+
+  <div class="section-title">Check-ins por dia</div>
+  <div class="chart-box"><div id="chartCheckins" class="mini-chart"></div></div>
+</div>
+
+<script>
+// Gráficos de barras em SVG puro (sem depender de CDN), no mesmo espírito
+// do gráfico de evolução do perfil do aluno.
+function desenharBarras(containerId, labels, serieA, corA, serieB, corB) {
+  const container = document.getElementById(containerId);
+  const w = 340, h = 160, padL = 6, padR = 6, padT = 10, padB = 20;
+  const n = labels.length;
+  const todos = serieB ? serieA.concat(serieB) : serieA;
+  const max = Math.max(1, ...todos);
+  const largura = (w - padL - padR) / n;
+  const larguraBarra = serieB ? largura / 2.6 : largura / 1.6;
+
+  function barra(valor, x, cor) {
+    const alturaBarra = (valor / max) * (h - padT - padB);
+    const y = h - padB - alturaBarra;
+    return `<rect x="${x}" y="${y}" width="${larguraBarra}" height="${Math.max(alturaBarra, valor > 0 ? 2 : 0)}" rx="2" fill="${cor}"></rect>`;
+  }
+
+  let barras = '';
+  for (let i = 0; i < n; i++) {
+    const cx = padL + i * largura + largura / 2;
+    if (serieB) {
+      barras += barra(serieA[i], cx - larguraBarra - 1, corA);
+      barras += barra(serieB[i], cx + 1, corB);
+    } else {
+      barras += barra(serieA[i], cx - larguraBarra / 2, corA);
+    }
+  }
+
+  // Só mostra 1 a cada N rótulos pra não amontoar texto no eixo X.
+  const passoRotulo = Math.ceil(n / 8);
+  let rotulos = '';
+  for (let i = 0; i < n; i += passoRotulo) {
+    const cx = padL + i * largura + largura / 2;
+    rotulos += `<text x="${cx}" y="${h - 6}" font-size="8.5" fill="#A99C82" text-anchor="middle">${labels[i]}</text>`;
+  }
+
+  container.innerHTML = `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:${h}px;">${barras}${rotulos}</svg>`;
+}
+
+const LABELS = {{ labels|tojson }};
+desenharBarras('chartFinanceiro', LABELS, {{ receitas_dia|tojson }}, '#34D399', {{ despesas_dia|tojson }}, '#F87171');
+desenharBarras('chartAlunos', LABELS, {{ novos_alunos_dia|tojson }}, '#3A6EB2');
+desenharBarras('chartCheckins', LABELS, {{ checkins_dia|tojson }}, '#1A3A66');
+</script>
+{% endblock %}

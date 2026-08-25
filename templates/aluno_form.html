@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}{{ 'Editar Aluno' if editando else 'Novo Aluno' }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('aluno_perfil', aluno_id=aluno_id) if editando else url_for('dashboard') }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>{{ 'Editar Aluno' if editando else 'Cadastrar Aluno' }}</h2>
+  </div>
+
+  <form method="post" class="card" style="max-width:none;"
+        action="{{ url_for('aluno_editar', aluno_id=aluno_id) if editando else url_for('aluno_novo') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="section-title" style="margin-top:0;">Dados Pessoais</div>
+
+    <label>Nome completo *</label>
+    <input type="text" name="nome" value="{{ aluno.nome if aluno else '' }}" placeholder="Nome do aluno" required>
+
+    <div class="row">
+      <div><label>Idade</label><input type="number" name="idade" min="0" max="120" value="{{ aluno.idade if aluno else '' }}" placeholder="Ex: 28"></div>
+      <div><label>Telefone (WhatsApp)</label><input type="tel" name="telefone" value="{{ aluno.telefone if aluno else '' }}" placeholder="(DDD) 9xxxx-xxxx"></div>
+    </div>
+
+    <div class="row">
+      <div><label>E-mail</label><input type="email" name="email" value="{{ aluno.email if aluno else '' }}" placeholder="aluno@email.com"></div>
+      <div>
+        <label>Sexo</label>
+        <select name="sexo">
+          <option value="Masculino" {{ 'selected' if aluno and aluno.sexo == 'Masculino' }}>Masculino</option>
+          <option value="Feminino" {{ 'selected' if aluno and aluno.sexo == 'Feminino' }}>Feminino</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div><label>Cidade</label><input type="text" name="cidade" value="{{ aluno.cidade if aluno else '' }}" placeholder="Ex: Fortaleza"></div>
+      <div><label>Região</label><input type="text" name="regiao" placeholder="Ex: Centro, Zona Sul..." value="{{ aluno.regiao if aluno else '' }}"></div>
+    </div>
+
+    <div class="row">
+      <div><label>Academia</label><input type="text" name="academia" value="{{ aluno.academia if aluno else '' }}" placeholder="Nome da academia"></div>
+      <div>
+        <label>Objetivo principal</label>
+        <select name="objetivo">
+          <option value="" {{ 'selected' if not (aluno and aluno.objetivo) }}>Selecione...</option>
+          {% for op in ['Hipertrofia','Emagrecimento','Definição','Condicionamento','Força','Reabilitação','Performance'] %}
+          <option value="{{ op }}" {{ 'selected' if aluno and aluno.objetivo == op }}>{{ op }}</option>
+          {% endfor %}
+          {% if aluno and aluno.objetivo and aluno.objetivo not in ['Hipertrofia','Emagrecimento','Definição','Condicionamento','Força','Reabilitação','Performance'] %}
+          <option value="{{ aluno.objetivo }}" selected>{{ aluno.objetivo }}</option>
+          {% endif %}
+        </select>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary">
+      {{ 'SALVAR ALTERAÇÕES' if editando else 'PRÓXIMO — CONTINUAR PARA A ANAMNESE' }}
+    </button>
+  </form>
+</div>
+{% endblock %}

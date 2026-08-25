@@ -1,0 +1,66 @@
+{% from "_icons.html" import svg %}
+{# Bolha de mensagem do chat — usada tanto na tela do personal quanto na
+   do aluno (cada uma define 'minha_chave' antes do include). Cobre os 5
+   tipos possíveis: texto, áudio, vídeo, imagem e cartão de relatório de
+   avaliação (auto-enviado quando o personal finaliza uma avaliação). O
+   mesmo layout é reproduzido em JavaScript (static/js/chat.js) para as
+   mensagens que chegam depois, via polling, sem recarregar a página. #}
+{% set minha = (item.remetente == minha_chave) %}
+{% if not item.apagada %}
+{# Mensagem apagada não deixa nenhum rastro na tela — nem bolha, nem aviso
+   "🚫 Mensagem apagada" — mesmo dias depois, ao reabrir a conversa. #}
+<div class="chat-bolha tipo-{{ item.tipo or 'texto' }} {{ 'minha' if minha else 'dele' }}" data-id="{{ item.id }}" data-lida="{{ 1 if item.lida else 0 }}" data-apagada="0">
+  {% if item.tipo == 'audio' %}
+    <div class="chat-audio-player" data-src="{{ item.midia_url }}" data-duracao="{{ item.midia_duracao or 0 }}">
+      <button type="button" class="chat-audio-btn" onclick="window.alternarAudio(this)">{{ svg('play') }}</button>
+      <div class="chat-audio-meio">
+        <input type="range" class="chat-audio-progress" min="0" max="100" value="0" oninput="window.buscarAudio(this)">
+        <span class="chat-audio-tempo">0:00</span>
+      </div>
+      <button type="button" class="chat-audio-velocidade" onclick="window.alternarVelocidade(this)">1x</button>
+    </div>
+  {% elif item.tipo == 'video' %}
+    <div class="chat-midia-thumb chat-midia-video" onclick="window.abrirVisualizador('video', '{{ item.midia_url }}')">
+      <video src="{{ item.midia_url }}" preload="metadata" muted playsinline></video>
+      <span class="chat-midia-play-overlay">{{ svg('play') }}</span>
+    </div>
+  {% elif item.tipo == 'imagem' %}
+    <div class="chat-midia-thumb" onclick="window.abrirVisualizador('imagem', '{{ item.midia_url }}')">
+      <img src="{{ item.midia_url }}" alt="Foto enviada" loading="lazy">
+    </div>
+  {% elif item.tipo == 'relatorio_avaliacao' and item.resumo_avaliacao %}
+    {% set r = item.resumo_avaliacao %}
+    <div class="chat-relatorio-card">
+      <div class="chat-relatorio-titulo">{{ svg('grafico-pizza') }} Relatório de avaliação física</div>
+      <div class="chat-relatorio-gauges">
+        <div class="chat-gauge-mini">
+          {% set circ = 2 * 3.14159 * 26 %}
+          <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="none" stroke="#17130D" stroke-width="7"/><circle cx="32" cy="32" r="26" fill="none" stroke="{{ r.gauge_imc.cor }}" stroke-width="7" stroke-linecap="round" transform="rotate(-90 32 32)" stroke-dasharray="{{ circ }}" stroke-dashoffset="{{ circ * (1 - r.gauge_imc.pct/100) }}"/></svg>
+          <div class="chat-gauge-mini-num">{{ r.imc or '-' }}</div>
+          <div class="chat-gauge-mini-rot">IMC</div>
+        </div>
+        <div class="chat-gauge-mini">
+          {% set circ = 2 * 3.14159 * 26 %}
+          <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="none" stroke="#17130D" stroke-width="7"/><circle cx="32" cy="32" r="26" fill="none" stroke="{{ r.gauge_bf.cor }}" stroke-width="7" stroke-linecap="round" transform="rotate(-90 32 32)" stroke-dasharray="{{ circ }}" stroke-dashoffset="{{ circ * (1 - r.gauge_bf.pct/100) }}"/></svg>
+          <div class="chat-gauge-mini-num">{{ r.bf or '-' }}%</div>
+          <div class="chat-gauge-mini-rot">Gordura</div>
+        </div>
+      </div>
+      <div class="chat-relatorio-stats">
+        {% if r.peso %}<span class="chat-relatorio-chip">Peso: {{ r.peso }}kg</span>{% endif %}
+        {% if r.massa_magra %}<span class="chat-relatorio-chip">Massa magra: {{ r.massa_magra }}kg</span>{% endif %}
+        {% if r.massa_gorda %}<span class="chat-relatorio-chip">Massa gorda: {{ r.massa_gorda }}kg</span>{% endif %}
+      </div>
+      <a href="{{ item.url_relatorio }}" class="chat-relatorio-btn">Ver relatório completo</a>
+    </div>
+  {% else %}
+    <div class="chat-bolha-texto">{{ item.texto }}</div>
+  {% endif %}
+  <div class="chat-bolha-rodape">
+    <span class="chat-bolha-hora">{{ (item.enviado_em or '')[11:16] }}</span>
+    {% if minha %}
+      <span class="chat-checks {{ 'lida' if item.lida else 'entregue' }}">{{ svg('check-duplo') }}</span>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

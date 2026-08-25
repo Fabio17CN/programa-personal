@@ -1,0 +1,823 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}{{ treino.nome_treino or 'Ficha de treino' }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('aluno_meus_treinos') }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>{{ treino.nome_treino or 'Ficha de treino' }}</h2>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:-10px 0 16px;">
+    <p style="color:var(--subtext);font-size:12.5px;margin:0;">Atualizada em {{ (treino.data or '')[:10] }}</p>
+    <button type="button" class="btn-baixar-pdf" id="btnBaixarPdfTreino"
+      data-url="{{ url_for('aluno_treino_pdf', treino_id=treino.id) }}"
+      data-nome="Treino_{{ (aluno.nome or 'aluno').replace(' ', '_') }}.pdf">⬇ Baixar PDF</button>
+  </div>
+
+  {% if dias %}
+    {% if dias|length > 1 %}
+      <div class="tabs-dias-treino" id="tabsDiasTreino">
+        {% for dia in dias %}
+          {% if dia.exercicios %}
+            <button type="button" class="tab-dia-treino{{ ' ativo' if loop.index0 == (indice_dia_hoje if indice_dia_hoje is not none else 0) else '' }}" data-alvo="dia-treino-{{ loop.index0 }}">
+              <span class="letra">{{ dia.letra or 'A' }}</span>
+              {% if dia.dia_semana %}<span class="semana">{{ dia.dia_semana }}</span>{% endif %}
+              {% if indice_dia_hoje is not none and loop.index0 == indice_dia_hoje %}<span class="ponto-hoje"></span>{% endif %}
+            </button>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if indice_dia_hoje is not none %}
+      <div class="aviso-treino-hoje">🔥 Hoje é dia do treino "{{ dias[indice_dia_hoje].letra or 'A' }}" — bora treinar!</div>
+    {% endif %}
+
+    {% for dia in dias %}
+      {% if dia.exercicios %}
+        {% set exibir_por_padrao = loop.index0 == (indice_dia_hoje if indice_dia_hoje is not none else 0) %}
+        <div class="bloco-dia-treino" id="dia-treino-{{ loop.index0 }}" data-total="{{ dia.exercicios|length }}" style="display:{{ 'block' if exibir_por_padrao else 'none' }};">
+          <div class="section-title" style="display:flex;justify-content:space-between;align-items:baseline;">
+            <span>Treino "{{ dia.letra or 'A' }}"{% if dia.dia_semana %} — {{ dia.dia_semana }}{% endif %}{% if dia.grupo_muscular %} · {{ dia.grupo_muscular }}{% endif %}</span>
+          </div>
+
+          <div class="barra-progresso-treino">
+            <div class="barra-progresso-preenchida" style="width:0%;"></div>
+          </div>
+          <div class="texto-progresso-treino" style="color:var(--subtext);font-size:11.5px;margin:6px 0 14px;">0 de {{ dia.exercicios|length }} exercícios concluídos</div>
+
+          {% for ex in dia.exercicios %}
+            <div class="card card-exercicio-aluno" style="max-width:none;margin-bottom:10px;">
+              <label class="linha-check-exercicio">
+                <input type="checkbox" class="check-exercicio-feito" data-descanso="{{ ex.descanso or '' }}" data-exercicio="{{ ex.nome or 'Exercício' }}">
+                <span class="numero-exercicio">{{ loop.index }}</span>
+                <strong class="nome-exercicio">{{ ex.nome or 'Exercício' }}</strong>
+              </label>
+
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+                {% if ex.series %}<span class="pill-treino">{{ ex.series }} séries</span>{% endif %}
+                {% if ex.reps %}<span class="pill-treino">{{ ex.reps }} repetições</span>{% endif %}
+              </div>
+
+              {% if ex.obs %}
+                <p style="color:var(--subtext);font-size:12.5px;margin:10px 0 0;">{{ ex.obs }}</p>
+              {% endif %}
+
+              {% set yt_id = (ex.video or '')|youtube_id %}
+              {% if yt_id %}
+                <div class="rotulo-demonstracao">▶ Demonstração em vídeo</div>
+                <div class="video-embed-exercicio">
+                  <iframe src="https://www.youtube.com/embed/{{ yt_id }}" title="Demonstração — {{ ex.nome or 'exercício' }}"
+                    loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen></iframe>
+                </div>
+              {% elif ex.video %}
+                <a href="{{ ex.video }}" target="_blank" rel="noopener" class="link-video-exercicio">▶ Ver vídeo do exercício</a>
+              {% elif ex.gif %}
+                <div class="rotulo-demonstracao">▶ Demonstração do exercício</div>
+                <img src="{{ url_for('static', filename='exercicios/gifs/' ~ ex.gif) }}" class="gif-exercicio-aluno" loading="lazy" alt="Demonstração — {{ ex.nome or 'exercício' }}">
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endfor %}
+  {% else %}
+    <div class="empty-state"><div class="empty-ic">🏋️</div><p>Essa ficha ainda não tem exercícios cadastrados.</p></div>
+  {% endif %}
+
+  {% if treino.observacoes %}
+    <div class="card" style="max-width:none;margin-top:6px;">
+      <strong style="color:var(--primary);">Observações do personal</strong>
+      <p style="color:var(--text);font-size:13.5px;margin:8px 0 0;">{{ treino.observacoes }}</p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Alarme de descanso: aparece flutuando ao marcar um exercício como feito
+     (ou ao tocar no selo "⏱ Xs descanso"), conta o tempo regressivo e avisa
+     com som + vibração quando termina. -->
+<div class="barra-descanso" id="barraDescanso" style="display:none;">
+  <div class="barra-descanso-info">
+    <span class="barra-descanso-label" id="descansoLabel">⏱ Descanso</span>
+    <span class="barra-descanso-tempo" id="descansoTempo">0:00</span>
+  </div>
+  <div class="barra-descanso-progresso"><div class="barra-descanso-progresso-preenchida" id="descansoBarraPreenchida"></div></div>
+  <div class="barra-descanso-acoes">
+    <button type="button" class="btn-descanso-acao" id="btnDescanso15">+15s</button>
+    <button type="button" class="btn-descanso-acao btn-pular-descanso" id="btnPularDescanso">Pular descanso</button>
+  </div>
+</div>
+
+<!-- Cronômetro flutuante: independente do descanso de cada exercício.
+     Começa em 60s por padrão, é ajustável, e um toque sobre ele já inicia
+     a contagem regressiva sozinho, com alarme sonoro + vibração no fim. -->
+<div class="cronometro-flutuante" id="cronometroFlutuante">
+  <button type="button" class="cronometro-btn-ajustar" id="btnAjustarCronometro" title="Ajustar tempo do cronômetro">⚙</button>
+  <button type="button" class="cronometro-btn" id="btnCronometro" title="Toque para iniciar o cronômetro">
+    <span class="cronometro-numero" id="cronometroDisplay">60</span>
+    <span class="cronometro-legenda" id="cronometroLegenda">toque p/ iniciar</span>
+  </button>
+</div>
+<div class="cronometro-ajuste-fundo" id="cronometroAjusteFundo" style="display:none;">
+  <div class="cronometro-ajuste-card">
+    <strong>Ajustar cronômetro</strong>
+    <p>Defina quantos segundos o cronômetro deve contar. Depois de salvar, é só tocar nele pra iniciar.</p>
+    <input type="number" id="inputCronometroSegundos" min="5" max="900" step="5" value="60" inputmode="numeric">
+    <div class="cronometro-ajuste-acoes">
+      <button type="button" class="btn-outline" id="btnCancelarAjusteCronometro">Cancelar</button>
+      <button type="button" class="btn-primary" id="btnSalvarAjusteCronometro">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Alerta de tempo esgotado em tela cheia: funciona em QUALQUER celular,
+     mesmo quando o som do alarme não toca (iPhone/Safari costuma bloquear
+     áudio criado fora de um toque direto, principalmente depois de o
+     aparelho ficar um tempo parado com a tela ligada esperando o
+     cronômetro). Pisca, vibra se o aparelho suportar, e some sozinho ou no
+     toque — assim o aviso nunca depende só do som pra ser percebido. -->
+<div class="alerta-tempo-fundo" id="alertaTempoFundo" style="display:none;">
+  <div class="alerta-tempo-card">
+    <div class="alerta-tempo-icone">⏰</div>
+    <strong id="alertaTempoTitulo">Tempo esgotado!</strong>
+    <p id="alertaTempoTexto">Hora de continuar o treino.</p>
+    <button type="button" class="btn-primary" id="btnFecharAlertaTempo">OK, continuar</button>
+  </div>
+</div>
+
+<style>
+/* --- Cronômetro flutuante (independente do descanso por exercício) --- */
+.cronometro-flutuante {
+  /* "position: fixed" ficava preso à tela toda (viewport) e por isso
+     escapava pra fora do "janelão" de vidro. Com "absolute" (o .container
+     do janelão já é o "position: relative" mais próximo), o cronômetro
+     flutua sempre colado no canto do próprio painel, nunca fora dele.
+     O !important é necessário porque toda a base.html já tem uma regra
+     genérica (".container > *") forçando "position: relative" em todo
+     filho direto do janelão — sem isso, essa regra teria prioridade e
+     desfaria o posicionamento flutuante de novo. */
+  position: absolute !important;
+  right: 28px !important;
+  bottom: 100px !important;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.cronometro-btn {
+  width: 66px; height: 66px; border-radius: 50%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: linear-gradient(165deg, rgba(12,20,32,0.85), rgba(9,15,24,0.92));
+  border: 1px solid var(--primary);
+  color: var(--text);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow: 0 10px 26px rgba(0,0,0,0.45), 0 0 18px rgba(58,110,178,0.28);
+  cursor: pointer;
+  transition: transform .15s ease;
+  padding: 0;
+}
+.cronometro-btn:active { transform: scale(0.93); }
+.cronometro-btn.cronometro-rodando { border-color: var(--success); box-shadow: 0 10px 26px rgba(0,0,0,0.45), 0 0 18px rgba(16,185,129,0.35); }
+.cronometro-numero { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.cronometro-legenda { font-size: 7.5px; color: var(--subtext); text-transform: uppercase; letter-spacing: .4px; margin-top: 1px; }
+.cronometro-btn-ajustar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--card-2); border: 1px solid var(--border); color: var(--subtext);
+  font-size: 13px; cursor: pointer;
+}
+.cronometro-ajuste-fundo {
+  /* !important pelo mesmo motivo do cronômetro: a regra genérica da
+     base.html força "position: relative" em todo filho direto do
+     janelão, o que desfaria esse fundo cobrindo a tela toda. */
+  position: fixed !important; inset: 0 !important; z-index: 60;
+  background: rgba(0,0,0,0.55);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.cronometro-ajuste-card {
+  width: 100%; max-width: 320px;
+  background: linear-gradient(165deg, rgba(12,20,32,0.96), rgba(9,15,24,0.98));
+  border: 1px solid var(--border);
+  border-radius: 18px; padding: 20px;
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+}
+.cronometro-ajuste-card strong { font-size: 15px; }
+.cronometro-ajuste-card p { color: var(--subtext); font-size: 12px; margin: 8px 0 14px; }
+.cronometro-ajuste-card input {
+  width: 100%; padding: 10px 12px; border-radius: 10px;
+  background: var(--card-2); border: 1px solid var(--border); color: var(--text);
+  font-size: 16px; text-align: center; margin-bottom: 14px;
+}
+.cronometro-ajuste-acoes { display: flex; gap: 10px; }
+.cronometro-ajuste-acoes button { flex: 1; }
+
+.btn-baixar-pdf {
+  flex:0 0 auto; font-size:11.5px; font-weight:700; color: var(--primary);
+  background: var(--card-2); border:1px solid var(--primary); border-radius:20px;
+  padding:6px 14px; text-decoration:none; white-space:nowrap;
+  font-family:inherit; cursor:pointer; appearance:none; -webkit-appearance:none; outline:none;
+}
+.btn-baixar-pdf:hover { background: var(--primary); color:#fff; }
+.btn-baixar-pdf:disabled { opacity:0.7; cursor:default; }
+
+.aviso-treino-hoje {
+  background: linear-gradient(135deg, rgba(58,110,178,0.18), rgba(58,110,178,0.06));
+  border: 1px solid rgba(58,110,178,0.35); border-radius: 12px; padding: 10px 14px;
+  font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 14px;
+}
+
+.tabs-dias-treino { display:flex; gap:8px; overflow-x:auto; padding:4px 2px 14px; }
+.tab-dia-treino {
+  position:relative; flex:0 0 auto; display:flex; flex-direction:column; align-items:center; min-width:56px;
+  padding:8px 12px; border-radius:12px; border:1px solid var(--border); background:var(--card-2);
+  color:var(--text); cursor:pointer; transition:transform .12s ease, border-color .12s ease;
+}
+.tab-dia-treino:hover { border-color:var(--primary); }
+.tab-dia-treino .letra { font-size:15px; font-weight:800; }
+.tab-dia-treino .semana { font-size:9px; color:var(--subtext); margin-top:2px; }
+.tab-dia-treino.ativo {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  border-color: var(--primary); color:#fff; transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(58,110,178,0.35);
+}
+.tab-dia-treino.ativo .semana { color:#FCEFD0; }
+.ponto-hoje {
+  position:absolute; top:-3px; right:-3px; width:9px; height:9px; border-radius:50%;
+  background: var(--success); border:2px solid var(--bg, #0A0806);
+}
+
+.barra-progresso-treino { height:7px; border-radius:20px; background:var(--card-2); border:1px solid var(--border); overflow:hidden; }
+.barra-progresso-preenchida { height:100%; background:linear-gradient(90deg, var(--success), #34D399); transition:width .3s ease; border-radius:20px; }
+
+.card-exercicio-aluno { transition: border-color .15s ease, opacity .15s ease; }
+.card-exercicio-aluno.concluido { border-color: var(--success); opacity: 0.75; }
+.card-exercicio-aluno.concluido .nome-exercicio { text-decoration: line-through; color: var(--subtext); }
+
+.linha-check-exercicio { display:flex; align-items:center; gap:10px; cursor:pointer; }
+.linha-check-exercicio input[type="checkbox"] {
+  width:20px; height:20px; flex:0 0 auto; accent-color: var(--success); cursor:pointer;
+}
+.numero-exercicio {
+  flex:0 0 auto; width:22px; height:22px; border-radius:50%; background:var(--card-2);
+  border:1px solid var(--border); color:var(--primary); font-size:11px; font-weight:800;
+  display:flex; align-items:center; justify-content:center;
+}
+.nome-exercicio { color:var(--primary); font-size:14.5px; }
+
+.pill-treino {
+  font-size:11.5px; font-weight:700; color:var(--text); background:var(--card-2);
+  border:1px solid var(--border); border-radius:20px; padding:4px 11px;
+}
+.pill-descanso { color:var(--primary); border-color: var(--primary); }
+
+.rotulo-demonstracao { font-size:11px; font-weight:700; color:var(--subtext); margin-top:12px; }
+.video-embed-exercicio {
+  position:relative; width:100%; padding-top:56.25%; margin-top:6px;
+  border-radius:12px; overflow:hidden; background:#000;
+}
+.video-embed-exercicio iframe {
+  position:absolute; top:0; left:0; width:100%; height:100%; border:0;
+}
+.link-video-exercicio {
+  display:inline-block; margin-top:10px; color:var(--primary); font-size:12.5px;
+  font-weight:700; text-decoration:none;
+}
+.gif-exercicio-aluno {
+  width:100%; max-width:220px; border-radius:12px; margin-top:6px; display:block;
+}
+
+button.pill-treino { font-family:inherit; }
+.btn-iniciar-descanso { cursor:pointer; transition: background .15s ease, color .15s ease, transform .15s ease; }
+.btn-iniciar-descanso:hover { background:var(--primary); color:#1B1206; }
+.btn-iniciar-descanso:active { transform:scale(0.95); }
+
+.barra-descanso {
+  display:none; flex-direction:column; gap:8px;
+  position:fixed; left:50%; bottom:72px; transform:translateX(-50%);
+  width:calc(100% - 32px); max-width:448px; z-index:500;
+  background:var(--card-2); border:1px solid var(--primary); border-radius:16px;
+  padding:12px 14px; box-shadow:0 10px 30px rgba(0,0,0,0.45);
+}
+.barra-descanso.descanso-concluido { border-color: var(--success); animation: pulsoDescanso .6s ease 2; }
+@keyframes pulsoDescanso {
+  0%, 100% { transform:translateX(-50%) scale(1); }
+  50% { transform:translateX(-50%) scale(1.03); }
+}
+.barra-descanso-info { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.barra-descanso-label {
+  font-size:12px; font-weight:700; color:var(--primary); white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis;
+}
+.barra-descanso-tempo { font-size:19px; font-weight:800; color:var(--text); font-variant-numeric: tabular-nums; flex-shrink:0; }
+.barra-descanso-progresso { height:6px; border-radius:20px; background:var(--card); border:1px solid var(--border); overflow:hidden; }
+.barra-descanso-progresso-preenchida {
+  height:100%; width:100%; background:linear-gradient(90deg, var(--primary), var(--primary-light));
+  transition:width 1s linear; border-radius:20px;
+}
+.barra-descanso.descanso-concluido .barra-descanso-progresso-preenchida { background: linear-gradient(90deg, var(--success), #34D399); }
+.barra-descanso-acoes { display:flex; gap:8px; }
+.btn-descanso-acao {
+  flex:1; background:transparent; border:1px solid var(--border); color:var(--subtext);
+  border-radius:10px; padding:7px 0; font-size:11.5px; font-weight:700; cursor:pointer; font-family:inherit;
+  transition: border-color .15s ease, color .15s ease;
+}
+.btn-descanso-acao:hover { border-color: var(--primary); color:var(--text); }
+.btn-pular-descanso:hover { border-color: var(--danger); color: var(--danger); }
+
+.aviso-exercicio-concluido {
+  position:fixed; left:50%; top:16px; transform:translateX(-50%) translateY(-12px);
+  z-index:9999; max-width:calc(100% - 32px);
+  background: linear-gradient(135deg, var(--success), #34D399); color:#0B1F16;
+  font-weight:700; font-size:13px; padding:10px 18px; border-radius:14px;
+  box-shadow:0 10px 26px rgba(0,0,0,0.4); text-align:center;
+  opacity:0; transition: opacity .25s ease, transform .25s ease;
+  pointer-events:none;
+}
+.aviso-exercicio-concluido.visivel { opacity:1; transform:translateX(-50%) translateY(0); }
+
+.alerta-tempo-fundo {
+  /* !important pelo mesmo motivo dos outros overlays: a regra genérica da
+     base.html força "position: relative" em todo filho direto do
+     janelão, o que desfaria isso cobrindo a tela toda. */
+  position: fixed !important; inset: 0 !important; z-index: 9998;
+  background: rgba(0,0,0,0.72);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  animation: piscaAlertaTempo 0.9s ease-in-out 4;
+}
+@keyframes piscaAlertaTempo {
+  0%, 100% { background: rgba(0,0,0,0.72); }
+  50% { background: rgba(239,68,68,0.55); }
+}
+.alerta-tempo-card {
+  width: 100%; max-width: 320px; text-align: center;
+  background: linear-gradient(165deg, rgba(12,20,32,0.97), rgba(9,15,24,0.99));
+  border: 1px solid var(--primary); border-radius: 20px; padding: 28px 22px;
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+}
+.alerta-tempo-icone { font-size: 44px; margin-bottom: 6px; animation: balancaAlertaTempo 0.6s ease-in-out infinite; }
+@keyframes balancaAlertaTempo {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(8deg); }
+}
+.alerta-tempo-card strong { display: block; font-size: 19px; color: var(--text); margin-bottom: 6px; }
+.alerta-tempo-card p { color: var(--subtext); font-size: 13.5px; margin: 0 0 20px; }
+.alerta-tempo-card .btn-primary { width: 100%; }
+</style>
+
+<script>
+// AudioContext compartilhado entre o descanso por exercício e o cronômetro
+// flutuante. Precisa ser criado (ou "destravado" com .resume()) dentro de
+// um gesto real do usuário — um toque num botão — porque os navegadores em
+// modo estrito bloqueiam qualquer som criado fora de um gesto, silenciando
+// o alarme; como o alarme só toca sozinho quando o tempo acaba (não é mais
+// um gesto), a gente prepara o contexto no momento em que a pessoa aperta
+// "iniciar" e reaproveita ele depois, já destravado, pra tocar o alarme.
+var audioCtxCompartilhado = null;
+// iPhone/Safari costuma bloquear ou re-suspender o Web Audio API sozinho,
+// principalmente depois de o aparelho ficar um tempo esperando o
+// cronômetro terminar. Um elemento <audio> comum, "destravado" tocando e
+// pausando na hora do toque que inicia o cronômetro/descanso, costuma
+// continuar funcionando depois mesmo sem gesto — por isso o alarme toca
+// os dois jeitos ao mesmo tempo (osciladores + <audio>), pra garantir som
+// em qualquer aparelho, e não só em Android.
+var elementoAudioAlarme = null;
+function prepararAudioAlarme() {
+  if (!elementoAudioAlarme) {
+    elementoAudioAlarme = new Audio('data:audio/wav;base64,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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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');
+    elementoAudioAlarme.preload = 'auto';
+  }
+  return elementoAudioAlarme;
+}
+function destravarAudioCtx() {
+  if (!audioCtxCompartilhado) {
+    try {
+      audioCtxCompartilhado = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) { audioCtxCompartilhado = null; }
+  }
+  if (audioCtxCompartilhado && audioCtxCompartilhado.state === 'suspended') {
+    audioCtxCompartilhado.resume().catch(function () {});
+  }
+  // Destrava o elemento de áudio de reforço dentro do mesmo gesto do
+  // usuário: toca e pausa na hora, silenciosamente, só pra "abrir
+  // licença" pro navegador aceitar tocar ele de novo mais tarde sozinho.
+  try {
+    var el = prepararAudioAlarme();
+    var p = el.play();
+    if (p && p.catch) p.catch(function () {});
+    el.pause();
+    el.currentTime = 0;
+  } catch (e) {}
+  return audioCtxCompartilhado;
+}
+function tocarBeepsAlarme(ctx, tons) {
+  if (ctx) {
+    tons.forEach(function (par) {
+      var atraso = par[0], freq = par[1];
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + atraso);
+      gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + atraso + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + atraso + 0.15);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + atraso);
+      osc.stop(ctx.currentTime + atraso + 0.16);
+    });
+  }
+  // Reforço com <audio> — toca em paralelo aos osciladores. Se um dos
+  // dois falhar (comum em versões diferentes de iOS), o outro garante som.
+  try {
+    var el = prepararAudioAlarme();
+    el.currentTime = 0;
+    var p2 = el.play();
+    if (p2 && p2.catch) p2.catch(function () {});
+  } catch (e) {}
+}
+// iOS suspende o AudioContext sozinho se ele ficar "parado" por um
+// tempo — mesmo já tendo sido destravado num toque. Enquanto o
+// cronômetro ou o descanso estiverem contando, tenta reativar ele a
+// cada poucos segundos, pra chegar no fim da contagem já pronto pra
+// tocar o alarme de verdade.
+function manterAudioCtxAtivo() {
+  if (audioCtxCompartilhado && audioCtxCompartilhado.state === 'suspended') {
+    audioCtxCompartilhado.resume().catch(function () {});
+  }
+}
+setInterval(manterAudioCtxAtivo, 4000);
+
+// Alerta em tela cheia (funciona mesmo sem som nenhum) — usado tanto pelo
+// cronômetro quanto pelo descanso por exercício.
+function mostrarAlertaTempo(titulo, texto) {
+  var fundo = document.getElementById('alertaTempoFundo');
+  if (!fundo) return;
+  document.getElementById('alertaTempoTitulo').textContent = titulo || 'Tempo esgotado!';
+  document.getElementById('alertaTempoTexto').textContent = texto || '';
+  fundo.style.display = 'flex';
+  var fechar = function () {
+    fundo.style.display = 'none';
+    clearTimeout(auto);
+  };
+  var auto = setTimeout(fechar, 6000);
+  var btn = document.getElementById('btnFecharAlertaTempo');
+  if (btn) btn.onclick = fechar;
+  fundo.onclick = function (e) { if (e.target === fundo) fechar(); };
+}
+
+document.querySelectorAll('.tab-dia-treino').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab-dia-treino').forEach(t => t.classList.remove('ativo'));
+    tab.classList.add('ativo');
+    document.querySelectorAll('.bloco-dia-treino').forEach(b => b.style.display = 'none');
+    const alvo = document.getElementById(tab.dataset.alvo);
+    if (alvo) alvo.style.display = 'block';
+  });
+});
+
+// Aviso rápido de "exercício concluído": some sozinho depois de alguns
+// segundos. Usa o toast padrão do app (window.mostrarToast) quando ele
+// está disponível na tela; senão, cai num aviso simples próprio.
+function avisarExercicioConcluido() {
+  var mensagem = 'Exercício concluído! Siga para o próximo 💪';
+  if (window.mostrarToast) {
+    window.mostrarToast(mensagem, 'success');
+    return;
+  }
+  var aviso = document.createElement('div');
+  aviso.className = 'aviso-exercicio-concluido';
+  aviso.textContent = mensagem;
+  document.body.appendChild(aviso);
+  requestAnimationFrame(function () { aviso.classList.add('visivel'); });
+  setTimeout(function () {
+    aviso.classList.remove('visivel');
+    setTimeout(function () { aviso.remove(); }, 300);
+  }, 2200);
+}
+
+// Calcula a data de segunda-feira da semana atual (formato AAAA-MM-DD) —
+// usada como parte da chave do checklist salvo no aparelho do aluno, pra
+// que o "feito hoje" valha a semana inteira e reinicie sozinho toda
+// segunda-feira, sem precisar de nenhuma ação manual do aluno.
+function inicioDaSemanaIso(data) {
+  var d = new Date(data.getFullYear(), data.getMonth(), data.getDate());
+  var diaSemana = (d.getDay() + 6) % 7; // 0 = segunda ... 6 = domingo
+  d.setDate(d.getDate() - diaSemana);
+  var ano = d.getFullYear();
+  var mes = String(d.getMonth() + 1).padStart(2, '0');
+  var dia = String(d.getDate()).padStart(2, '0');
+  return ano + '-' + mes + '-' + dia;
+}
+
+// Checklist "feito na semana": lembrete visual pro próprio treino,
+// guardado no aparelho do aluno. A chave inclui a segunda-feira da semana
+// atual, então marcar um exercício vale a semana inteira (não só o dia) e,
+// assim que uma nova semana começa, tudo volta a ficar desmarcado
+// automaticamente — não precisa de conta nem servidor pra isso.
+document.querySelectorAll('.bloco-dia-treino').forEach(bloco => {
+  const chaveSemana = `treino_feito_${ {{ treino.id }} }_${bloco.id}_${inicioDaSemanaIso(new Date())}`;
+  let feitos = new Set();
+  try { feitos = new Set(JSON.parse(localStorage.getItem(chaveSemana) || '[]')); } catch (e) {}
+
+  const checks = bloco.querySelectorAll('.check-exercicio-feito');
+  const total = checks.length;
+  const barra = bloco.querySelector('.barra-progresso-preenchida');
+  const texto = bloco.querySelector('.texto-progresso-treino');
+
+  function atualizarProgresso() {
+    const n = feitos.size;
+    const pct = total ? Math.round((n / total) * 100) : 0;
+    if (barra) barra.style.width = pct + '%';
+    if (texto) texto.textContent = `${n} de ${total} exercícios concluídos` + (n === total && total > 0 ? ' 🎉' : '');
+    try { localStorage.setItem(chaveSemana, JSON.stringify([...feitos])); } catch (e) {}
+  }
+
+  checks.forEach((chk, i) => {
+    if (feitos.has(i)) {
+      chk.checked = true;
+      chk.closest('.card-exercicio-aluno').classList.add('concluido');
+    }
+    chk.addEventListener('change', () => {
+      const card = chk.closest('.card-exercicio-aluno');
+      if (chk.checked) {
+        feitos.add(i);
+        card.classList.add('concluido');
+        if (navigator.vibrate) navigator.vibrate(15);
+        avisarExercicioConcluido();
+      } else {
+        feitos.delete(i);
+        card.classList.remove('concluido');
+      }
+      atualizarProgresso();
+    });
+  });
+  atualizarProgresso();
+});
+
+// --- Alarme de descanso: toca um bipe (gerado na hora, sem arquivo de
+// áudio externo) e avisa o aluno assim que o tempo de descanso entre
+// séries termina — pode ser iniciado tocando no selo "⏱ Xs descanso" (se
+// a ficha tiver esse selo em algum exercício).
+(function () {
+  const barra = document.getElementById('barraDescanso');
+  if (!barra) return;
+  const elTempo = document.getElementById('descansoTempo');
+  const elLabel = document.getElementById('descansoLabel');
+  const elBarraPreenchida = document.getElementById('descansoBarraPreenchida');
+  let intervalo = null;
+  let restante = 0;
+  let total = 0;
+
+  // Aceita formatos livres que o personal costuma digitar: "60s", "90",
+  // "1min", "1,5 min", "1:30".
+  function parseDescansoSegundos(texto) {
+    if (!texto) return null;
+    const t = String(texto).trim().toLowerCase().replace(',', '.');
+    const mmss = t.match(/^(\d{1,2}):(\d{2})$/);
+    if (mmss) return parseInt(mmss[1], 10) * 60 + parseInt(mmss[2], 10);
+    const min = t.match(/(\d+(?:\.\d+)?)\s*min/);
+    if (min) return Math.round(parseFloat(min[1]) * 60);
+    const seg = t.match(/(\d+(?:\.\d+)?)/);
+    if (seg) return Math.round(parseFloat(seg[1]));
+    return null;
+  }
+
+  function formatarTempo(s) {
+    const m = Math.floor(s / 60);
+    const seg = s % 60;
+    return `${m}:${String(seg).padStart(2, '0')}`;
+  }
+
+  function tocarBipe() {
+    try {
+      tocarBeepsAlarme(destravarAudioCtx(), [[0, 880], [0.18, 880], [0.36, 1046.5]]);
+    } catch (e) { /* navegador sem suporte a áudio — segue só com o aviso visual */ }
+  }
+
+  function atualizarVisual() {
+    elTempo.textContent = formatarTempo(Math.max(restante, 0));
+    const pct = total ? Math.max(0, Math.min(100, (restante / total) * 100)) : 0;
+    elBarraPreenchida.style.width = pct + '%';
+  }
+
+  function avisarFimDoDescanso() {
+    barra.classList.add('descanso-concluido');
+    elTempo.textContent = 'Pronto!';
+    tocarBipe();
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
+    if (window.mostrarToast) window.mostrarToast('⏰ Descanso concluído — bora pro próximo!', 'success');
+    mostrarAlertaTempo('Descanso concluído!', 'Bora pro próximo exercício 💪');
+    setTimeout(() => { barra.style.display = 'none'; }, 4000);
+  }
+
+  function iniciarDescanso(segundos, nomeExercicio) {
+    if (!segundos || segundos <= 0) return;
+    destravarAudioCtx(); // chamado dentro do gesto (toque no selo) pra liberar o som do alarme depois
+    clearInterval(intervalo);
+    restante = segundos;
+    total = segundos;
+    barra.style.display = 'flex';
+    barra.classList.remove('descanso-concluido');
+    elLabel.textContent = nomeExercicio ? `⏱ Descanso — ${nomeExercicio}` : '⏱ Descanso';
+    atualizarVisual();
+    intervalo = setInterval(() => {
+      restante -= 1;
+      if (restante <= 0) {
+        clearInterval(intervalo);
+        restante = 0;
+        atualizarVisual();
+        avisarFimDoDescanso();
+        return;
+      }
+      atualizarVisual();
+    }, 1000);
+  }
+
+  function pararDescanso() {
+    clearInterval(intervalo);
+    barra.style.display = 'none';
+  }
+
+  document.querySelectorAll('.btn-iniciar-descanso').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const segundos = parseDescansoSegundos(btn.dataset.descanso);
+      iniciarDescanso(segundos, btn.dataset.exercicio);
+    });
+  });
+
+  const btn15 = document.getElementById('btnDescanso15');
+  if (btn15) btn15.addEventListener('click', () => {
+    if (!intervalo) return;
+    restante += 15;
+    total += 15;
+    atualizarVisual();
+  });
+  const btnPular = document.getElementById('btnPularDescanso');
+  if (btnPular) btnPular.addEventListener('click', pararDescanso);
+})();
+
+// --- Cronômetro flutuante: começa em 60s por padrão (ajustável e salvo no
+// aparelho do aluno), e um toque sobre ele já inicia a contagem regressiva,
+// com alarme sonoro + vibração no final — igual ao alarme de descanso.
+(function () {
+  const btn = document.getElementById('btnCronometro');
+  if (!btn) return;
+  const elDisplay = document.getElementById('cronometroDisplay');
+  const elLegenda = document.getElementById('cronometroLegenda');
+  const btnAjustar = document.getElementById('btnAjustarCronometro');
+  const fundoAjuste = document.getElementById('cronometroAjusteFundo');
+  const inputSegundos = document.getElementById('inputCronometroSegundos');
+  const btnSalvarAjuste = document.getElementById('btnSalvarAjusteCronometro');
+  const btnCancelarAjuste = document.getElementById('btnCancelarAjusteCronometro');
+
+  const CHAVE_LS = 'painelnm_cronometro_segundos';
+  let segundosConfigurados = parseInt(localStorage.getItem(CHAVE_LS), 10) || 60;
+  let restante = segundosConfigurados;
+  let total = segundosConfigurados;
+  let intervalo = null;
+  let rodando = false;
+
+  function formatarTempo(s) {
+    const m = Math.floor(s / 60);
+    const seg = s % 60;
+    return m > 0 ? `${m}:${String(seg).padStart(2, '0')}` : `${seg}`;
+  }
+
+  function atualizarVisual() {
+    elDisplay.textContent = formatarTempo(Math.max(restante, 0));
+  }
+
+  function tocarAlarme() {
+    try {
+      tocarBeepsAlarme(destravarAudioCtx(), [[0, 880], [0.18, 880], [0.36, 1046.5]]);
+    } catch (e) { /* segue só com o aviso visual/vibração */ }
+  }
+
+  function pararCronometro(resetar) {
+    clearInterval(intervalo);
+    intervalo = null;
+    rodando = false;
+    btn.classList.remove('cronometro-rodando');
+    elLegenda.textContent = 'toque p/ iniciar';
+    if (resetar) {
+      restante = segundosConfigurados;
+      atualizarVisual();
+    }
+  }
+
+  function iniciarCronometro() {
+    clearInterval(intervalo);
+    restante = segundosConfigurados;
+    total = segundosConfigurados;
+    rodando = true;
+    btn.classList.add('cronometro-rodando');
+    elLegenda.textContent = 'toque p/ parar';
+    atualizarVisual();
+    intervalo = setInterval(() => {
+      restante -= 1;
+      if (restante <= 0) {
+        clearInterval(intervalo);
+        intervalo = null;
+        rodando = false;
+        restante = 0;
+        atualizarVisual();
+        btn.classList.remove('cronometro-rodando');
+        elLegenda.textContent = 'toque p/ iniciar';
+        tocarAlarme();
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
+        if (window.mostrarToast) window.mostrarToast('⏰ Cronômetro concluído!', 'success');
+        mostrarAlertaTempo('Tempo esgotado!', 'O cronômetro chegou a zero.');
+        return;
+      }
+      atualizarVisual();
+    }, 1000);
+  }
+
+  atualizarVisual();
+
+  btn.addEventListener('click', () => {
+    if (rodando) {
+      pararCronometro(true);
+    } else {
+      iniciarCronometro();
+    }
+  });
+
+  if (btnAjustar) btnAjustar.addEventListener('click', () => {
+    inputSegundos.value = segundosConfigurados;
+    fundoAjuste.style.display = 'flex';
+  });
+  if (btnCancelarAjuste) btnCancelarAjuste.addEventListener('click', () => {
+    fundoAjuste.style.display = 'none';
+  });
+  if (fundoAjuste) fundoAjuste.addEventListener('click', (e) => {
+    if (e.target === fundoAjuste) fundoAjuste.style.display = 'none';
+  });
+  if (btnSalvarAjuste) btnSalvarAjuste.addEventListener('click', () => {
+    const valor = parseInt(inputSegundos.value, 10);
+    if (!valor || valor < 5) {
+      if (window.mostrarToast) window.mostrarToast('Informe pelo menos 5 segundos', 'warning');
+      return;
+    }
+    segundosConfigurados = valor;
+    localStorage.setItem(CHAVE_LS, String(valor));
+    pararCronometro(true);
+    fundoAjuste.style.display = 'none';
+    // Depois de ajustar, o próximo toque no cronômetro já inicia a
+    // contagem regressiva sozinho — não precisa de nenhum clique extra.
+  });
+})();
+
+// --- Baixar PDF: baixa o arquivo de verdade (em vez de só navegar até a
+// URL do PDF) e mantém o aluno na própria tela da ficha o tempo todo — sem
+// isso, em muitos navegadores de celular o link abria o PDF ocupando a
+// tela toda, sem nenhum jeito de voltar, e às vezes nem chegava a salvar
+// o arquivo (só ficava "visualizando"). Buscando o arquivo com fetch e
+// oferecendo ele como Blob, o navegador é forçado a salvar de verdade,
+// e a tela da ficha (com o botão "Voltar" no topo) nunca é trocada.
+(function () {
+  const btn = document.getElementById('btnBaixarPdfTreino');
+  if (!btn) return;
+  const textoOriginal = btn.textContent;
+
+  btn.addEventListener('click', () => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = 'Baixando…';
+
+    fetch(btn.dataset.url, { credentials: 'same-origin' })
+      .then(resposta => {
+        if (!resposta.ok) throw new Error('Falha ao gerar o PDF.');
+        const tipo = resposta.headers.get('Content-Type') || '';
+        if (tipo.indexOf('pdf') === -1) throw new Error('Resposta inesperada.');
+        return resposta.blob();
+      })
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = btn.dataset.nome || 'treino.pdf';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+      })
+      .catch(() => {
+        // Se algo falhar (ex: sessão expirada ou navegador sem suporte a
+        // Blob), cai pro comportamento antigo — mas numa aba nova, pra
+        // não perder a tela atual do aluno.
+        window.open(btn.dataset.url, '_blank');
+        if (window.mostrarToast) window.mostrarToast('Abrindo o PDF em uma nova aba…', 'warning');
+      })
+      .finally(() => {
+        btn.disabled = false;
+        btn.textContent = textoOriginal;
+      });
+  });
+})();
+</script>
+{% endblock %}

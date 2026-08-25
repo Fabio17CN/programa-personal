@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Enviar para {{ aluno.nome }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('aluno_perfil', aluno_id=aluno.id) }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>Enviar para {{ aluno.nome }}</h2>
+  </div>
+
+  {% if not aluno.telefone %}
+  <p style="font-size:12px;color:var(--subtext);margin-bottom:14px;">
+    Cadastre o telefone do aluno no perfil dele para liberar o envio direto pelo WhatsApp.
+  </p>
+  {% endif %}
+
+  <p id="aviso-https" style="display:none;font-size:12px;color:var(--warning);background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:10px 12px;margin-bottom:14px;">
+    ⚠️ Este site está sendo acessado sem HTTPS — por isso o botão 📲 só consegue <b>baixar</b> o PDF,
+    sem anexar automático no WhatsApp (é uma trava de segurança do próprio celular, não do sistema).
+    Para o anexo automático funcionar, o sistema precisa estar publicado com HTTPS.
+  </p>
+
+  {% if ultima_avaliacao %}
+  <div class="aluno-item">
+    <div>
+      <div class="nome">📄 Relatório Completo</div>
+      <div class="sub">Avaliação + fotos com análise de IA + treino, tudo junto</div>
+    </div>
+    <div class="row" style="flex:0 0 auto;gap:6px;">
+      <a href="{{ url_for('relatorio_completo_pdf', aluno_id=aluno.id) }}" class="btn btn-outline btn-sm" style="margin:0;">Baixar</a>
+      {% if aluno.telefone %}
+      <button type="button" class="btn wa-btn btn-sm btn-enviar-wa" style="margin:0;"
+              data-url="{{ url_for('relatorio_completo_pdf', aluno_id=aluno.id) }}"
+              data-nome="Relatorio_Completo_{{ aluno.nome }}.pdf">📲</button>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="section-title">Avaliações</div>
+  {% for a in avaliacoes|reverse %}
+    <div class="aluno-item">
+      <div>
+        <div class="nome">Avaliação {{ a.data[:10] }}</div>
+        <div class="sub">Peso {{ a.peso or '-' }}kg · BF {{ a.bf or '-' }}%</div>
+      </div>
+      <div class="row" style="flex:0 0 auto;gap:6px;">
+        <a href="{{ url_for('avaliacao_pdf', aluno_id=aluno.id, avaliacao_id=a.id) }}" class="btn btn-outline btn-sm" style="margin:0;">Baixar</a>
+        {% if aluno.telefone %}
+        <button type="button" class="btn wa-btn btn-sm btn-enviar-wa" style="margin:0;"
+                data-url="{{ url_for('avaliacao_pdf', aluno_id=aluno.id, avaliacao_id=a.id) }}"
+                data-nome="Avaliacao_{{ aluno.nome }}_{{ a.data[:10] }}.pdf">📲</button>
+        {% endif %}
+        <form method="post" action="{{ url_for('avaliacao_excluir', aluno_id=aluno.id, avaliacao_id=a.id) }}"
+              class="form-excluir-item" style="margin:0;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline btn-sm btn-excluir-item" style="margin:0;" title="Excluir esta avaliação">🗑️</button>
+        </form>
+      </div>
+    </div>
+  {% else %}
+    <div class="empty-state"><div class="empty-ic">📋</div><p>Nenhuma avaliação ainda.</p></div>
+  {% endfor %}
+
+  <div class="section-title">Treinos</div>
+  {% for t in treinos %}
+    <div class="aluno-item">
+      <div>
+        <div class="nome">{{ t.nome_treino }}</div>
+        <div class="sub">{{ t.data[:10] }}</div>
+      </div>
+      <div class="row" style="flex:0 0 auto;gap:6px;">
+        <a href="{{ url_for('treino_editar', aluno_id=aluno.id, treino_id=t.id) }}" class="btn btn-outline btn-sm" style="margin:0;" title="Editar esta ficha">✏️</a>
+        <a href="{{ url_for('treino_pdf', aluno_id=aluno.id, treino_id=t.id) }}" class="btn btn-outline btn-sm" style="margin:0;">Baixar</a>
+        {% if aluno.telefone %}
+        <button type="button" class="btn wa-btn btn-sm btn-enviar-wa" style="margin:0;"
+                data-url="{{ url_for('treino_pdf', aluno_id=aluno.id, treino_id=t.id) }}"
+                data-nome="Treino_{{ aluno.nome }}_{{ t.data[:10] }}.pdf">📲</button>
+        {% endif %}
+        <form method="post" action="{{ url_for('treino_excluir', aluno_id=aluno.id, treino_id=t.id) }}"
+              class="form-excluir-item" style="margin:0;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline btn-sm btn-excluir-item" style="margin:0;" title="Excluir esta ficha">🗑️</button>
+        </form>
+      </div>
+    </div>
+  {% else %}
+    <div class="empty-state"><div class="empty-ic">📝</div><p>Nenhum treino ainda.</p></div>
+  {% endfor %}
+
+  <p id="aviso-anexo" style="font-size:11.5px;color:var(--subtext);margin:14px 0 0;display:none;"></p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.form-excluir-item').forEach(form => {
+  form.addEventListener('submit', (evt) => {
+    if (!confirm('Excluir isso definitivamente? Não dá pra desfazer.')) {
+      evt.preventDefault();
+    }
+  });
+});
+if (!window.isSecureContext) {
+  document.getElementById('aviso-https').style.display = 'block';
+}
+</script>
+<script>
+const telefoneWa = "{{ aluno.telefone|telefone_whatsapp }}";
+const nomeAluno = {{ aluno.nome|tojson }};
+const avisoAnexo = document.getElementById('aviso-anexo');
+
+async function baixarComoArquivo(url, nomeArquivo) {
+  const resp = await fetch(url);
+  const blob = await resp.blob();
+  return new File([blob], nomeArquivo, { type: 'application/pdf' });
+}
+
+document.querySelectorAll('.btn-enviar-wa').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const url = btn.dataset.url;
+    const nome = btn.dataset.nome;
+    const textoOriginal = btn.textContent;
+    btn.textContent = '...';
+    try {
+      const arquivo = await baixarComoArquivo(url, nome);
+
+      // No celular (Android/iOS, navegador atualizado, site em HTTPS), isso abre
+      // o menu nativo de compartilhar do aparelho — ao escolher o WhatsApp, o
+      // PDF já vai ANEXADO de verdade, sem precisar fazer nada manual.
+      if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
+        await navigator.share({
+          files: [arquivo],
+          title: nome,
+          text: `Olá ${nomeAluno}, segue em anexo!`,
+        });
+        return;
+      }
+
+      // Sem suporte (normalmente em computador, ou site ainda sem HTTPS):
+      // isso é uma restrição do navegador/WhatsApp, não dá para contornar
+      // por código — baixa o PDF e abre a conversa, mas o anexo precisa
+      // ser arrastado manualmente dessa vez.
+      window.open(url, '_blank');
+      if (telefoneWa) {
+        setTimeout(() => {
+          window.open(`https://wa.me/${telefoneWa}?text=${encodeURIComponent('Olá ' + nomeAluno + ', segue em anexo!')}`, '_blank');
+        }, 400);
+      }
+      avisoAnexo.style.display = 'block';
+      if (!window.isSecureContext) {
+        avisoAnexo.textContent = 'O anexo automático só funciona com o site em HTTPS (cadeado no navegador). '
+          + 'Acessando por http:// (sem "s"), o celular bloqueia o compartilhamento de arquivo por segurança — '
+          + 'o PDF foi baixado, é só anexar manualmente dessa vez. Fale com quem publicou o sistema sobre habilitar HTTPS.';
+      } else {
+        avisoAnexo.textContent = 'Este navegador não permite anexar automaticamente (funciona em Chrome/Safari '
+          + 'atualizados no celular, com HTTPS). O PDF foi baixado — é só anexar na conversa que abriu.';
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        avisoAnexo.style.display = 'block';
+        avisoAnexo.textContent = 'Não foi possível preparar o envio automático. Use o botão "Baixar" e anexe manualmente.';
+      }
+    } finally {
+      btn.textContent = textoOriginal;
+    }
+  });
+});
+</script>
+{% endblock %}

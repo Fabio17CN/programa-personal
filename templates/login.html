@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Entrar - Personal Trainer{% endblock %}
+{% block content %}
+<div class="center-screen login-bg">
+  <div class="login-glow"></div>
+  <div class="card login-card card-vidro">
+    <div class="logo-wrap logo-wrap-lg">
+      <img src="{{ url_for('static', filename='icon-192-transparente.png') }}" alt="logo">
+    </div>
+    <h1 class="brand brand-elegant">PERSONAL TRAINER</h1>
+    <p class="slogan">Sua evolução, o meu compromisso.</p>
+    <p style="text-align:center;font-size:12px;letter-spacing:2px;color:var(--subtext);text-transform:uppercase;margin:-16px 0 22px;">Bem-vindo ao seu sistema</p>
+
+    <form method="post" id="form-login">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>E-mail ou ID de acesso</label>
+      <input type="text" name="usuario" id="campo-usuario-login" autocomplete="username" required>
+      <p style="color:var(--subtext);font-size:9.5px;margin:2px 0 0;">Use seu e-mail ou o ID de acesso (ex: AL0007)</p>
+      <label>Senha</label>
+      <input type="password" name="senha" autocomplete="current-password" required>
+
+      <div class="login-opcoes-row">
+        <label class="check-lembrar">
+          <input type="checkbox" name="lembrar" checked>
+          <span class="check-caixa"></span>
+          Mantenha-me conectado
+        </label>
+        <a href="{{ url_for('recuperar_senha') }}" class="link-esqueci">Esqueceu a senha?</a>
+      </div>
+
+      <button type="submit" class="btn btn-primary">ENTRAR NO SISTEMA →</button>
+    </form>
+    <a href="{{ url_for('criar_conta_escolha') }}" class="btn btn-link">ou criar nova conta</a>
+
+    <div class="login-trust-row">
+      <div class="login-trust-item"><span class="ic">🛡️</span>Segurança<br>avançada</div>
+      <div class="login-trust-item"><span class="ic">🔒</span>Dados<br>protegidos</div>
+      <div class="login-trust-item"><span class="ic">🎧</span>Suporte<br>dedicado</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Leve efeito de "vidro vivo": o cartão inclina suavemente seguindo o
+// mouse/dedo, como um reflexo real de vidro. Desativado automaticamente
+// se o usuário preferir menos movimento na tela (acessibilidade).
+(function () {
+  var reduzMovimento = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var cartao = document.querySelector('.login-card');
+  if (!cartao || reduzMovimento) return;
+
+  var alvoX = 0, alvoY = 0, atualX = 0, atualY = 0;
+  var ativo = false;
+
+  function aplicar() {
+    atualX += (alvoX - atualX) * 0.08;
+    atualY += (alvoY - atualY) * 0.08;
+    cartao.style.transform =
+      'rotateX(' + atualY + 'deg) rotateY(' + atualX + 'deg)';
+    if (ativo || Math.abs(alvoX - atualX) > 0.01 || Math.abs(alvoY - atualY) > 0.01) {
+      requestAnimationFrame(aplicar);
+    }
+  }
+
+  function mover(clientX, clientY) {
+    var r = cartao.getBoundingClientRect();
+    var px = (clientX - r.left) / r.width - 0.5;
+    var py = (clientY - r.top) / r.height - 0.5;
+    alvoX = px * 6;
+    alvoY = -py * 6;
+    if (!ativo) { ativo = true; requestAnimationFrame(aplicar); }
+  }
+
+  document.addEventListener('mousemove', function (e) { mover(e.clientX, e.clientY); });
+  document.addEventListener('mouseleave', function () { alvoX = 0; alvoY = 0; });
+  document.querySelector('.center-screen').style.perspective = '1200px';
+})();
+</script>
+{% endblock %}

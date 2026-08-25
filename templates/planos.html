@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Planos Personalizados{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('dashboard') }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>Planos Personalizados</h2>
+  </div>
+
+  <details class="card-toggle">
+    <summary>Novo plano</summary>
+    <form method="post" action="{{ url_for('planos_novo') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Nome do plano *</label>
+      <input type="text" name="nome" placeholder="Ex: Plano Trimestral" required>
+      <div class="row">
+        <div><label>Valor (R$)</label><input type="text" name="valor" inputmode="decimal" placeholder="Ex: 450,00"></div>
+        <div><label>Duração (dias)</label><input type="number" name="duracao_dias" value="30" min="1"></div>
+      </div>
+      <label>Descrição</label>
+      <textarea name="descricao" placeholder="O que está incluso no plano..."></textarea>
+      <button type="submit" class="btn btn-primary">CRIAR PLANO</button>
+    </form>
+  </details>
+
+  {% if planos %}
+    {% for p in planos %}
+      <div class="card" style="max-width:none;{{ 'opacity:0.55;' if not p.ativo }}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+          <div>
+            <div style="font-weight:800;font-size:16px;">{{ p.nome }}</div>
+            <div class="sub" style="color:var(--subtext);font-size:12px;margin-top:2px;">
+              {% if p.valor %}R$ {{ "%.2f"|format(p.valor)|replace(".", ",") }}{% endif %}
+              {% if p.duracao_dias %} · {{ p.duracao_dias }} dias{% endif %}
+              · {{ p.n_alunos }} aluno(s) ativo(s)
+            </div>
+          </div>
+          <span class="status-chip {{ 'status-pago' if p.ativo else 'status-atrasado' }}">{{ 'Ativo' if p.ativo else 'Inativo' }}</span>
+        </div>
+        {% if p.descricao %}<p style="font-size:13px;color:var(--subtext);margin:10px 0 0;">{{ p.descricao }}</p>{% endif %}
+
+        <details style="margin-top:12px;">
+          <summary style="cursor:pointer;color:var(--primary);font-size:12.5px;font-weight:700;">Atribuir a um aluno</summary>
+          <form method="post" action="{{ url_for('planos_atribuir', plano_id=p.id) }}" style="margin-top:8px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select name="aluno_id" required>
+              <option value="">Escolha o aluno...</option>
+              {% for a in alunos %}<option value="{{ a.id }}">{{ a.nome }}</option>{% endfor %}
+            </select>
+            <button type="submit" class="btn btn-success btn-sm" style="width:100%;">Vincular plano</button>
+          </form>
+        </details>
+
+        <div class="row" style="margin-top:12px;">
+          <form method="post" action="{{ url_for('planos_alternar', plano_id=p.id) }}" style="flex:1;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline btn-sm" style="width:100%;">{{ 'Desativar' if p.ativo else 'Reativar' }}</button>
+          </form>
+          <form method="post" action="{{ url_for('planos_excluir', plano_id=p.id) }}" style="flex:1;"
+                onsubmit="return confirm('Excluir o plano {{ p.nome }}?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline btn-sm" style="width:100%;color:var(--danger);border-color:var(--danger);">Excluir</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state"><div class="empty-ic">🔖</div><p>Nenhum plano criado ainda.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

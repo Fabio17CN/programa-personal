@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Mensagens{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('dashboard') }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>Mensagens</h2>
+  </div>
+
+  <div class="busca-conversa-wrap">
+    <input type="text" id="buscaConversa" placeholder="Buscar aluno..." oninput="filtrarConversas()">
+  </div>
+
+  <div id="listaConversas">
+    {% for c in conversas %}
+      <a href="{{ url_for('mensagens_conversa', aluno_id=c.aluno_id) }}" class="conversa-item" data-nome="{{ (c.nome or '')|lower }}">
+        <span class="conversa-avatar">
+          {% if c.foto_perfil %}
+            <img src="{{ url_for('servir_foto', aluno_id=c.aluno_id, nome_arquivo=c.foto_perfil|basename) }}" alt="Foto de {{ c.nome }}">
+          {% else %}
+            {{ (c.nome or '?')[0]|upper }}
+          {% endif %}
+        </span>
+        <span class="conversa-meio">
+          <span class="conversa-nome">{{ c.nome }}</span>
+          <span class="conversa-preview">
+            {% if c.ultima_texto is not none %}
+              {% if c.ultima_remetente == 'personal' %}Você: {% endif -%}
+              {%- if c.ultima_apagada -%}🚫 Mensagem apagada
+              {%- elif c.ultima_tipo == 'audio' -%}🎤 Áudio
+              {%- elif c.ultima_tipo == 'video' -%}🎥 Vídeo
+              {%- elif c.ultima_tipo == 'imagem' -%}📷 Foto
+              {%- elif c.ultima_tipo == 'relatorio_avaliacao' -%}📊 Relatório de avaliação
+              {%- else -%}{{ c.ultima_texto[:42] }}{% if c.ultima_texto|length > 42 %}…{% endif %}{%- endif -%}
+            {% else %}
+              Toque para iniciar conversa
+            {% endif %}
+          </span>
+        </span>
+        <span class="conversa-lado">
+          {% if c.ultima_data %}<span class="conversa-hora">{{ c.ultima_data[11:16] }}</span>{% endif %}
+          {% if c.nao_lidas %}<span class="conversa-badge">{{ c.nao_lidas }}</span>{% endif %}
+        </span>
+      </a>
+    {% endfor %}
+  </div>
+
+  {% if not conversas %}
+    <div class="empty-state"><div class="empty-ic">💬</div><p>Cadastre um aluno pra começar a conversar.</p></div>
+  {% endif %}
+</div>
+
+<script>
+function filtrarConversas() {
+  var termo = document.getElementById('buscaConversa').value.trim().toLowerCase();
+  document.querySelectorAll('#listaConversas .conversa-item').forEach(function (el) {
+    el.style.display = el.dataset.nome.indexOf(termo) === -1 ? 'none' : '';
+  });
+}
+</script>
+{% endblock %}

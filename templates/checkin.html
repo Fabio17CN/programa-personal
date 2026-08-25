@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Check-in de Alunos{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('dashboard') }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>Check-in de Alunos</h2>
+  </div>
+  <p style="font-size:12.5px;color:var(--subtext);margin-top:-8px;">Registre a presença do aluno quando ele chegar para o treino de hoje.</p>
+
+  <form method="post" action="{{ url_for('checkin_novo') }}" class="card" style="max-width:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Aluno</label>
+    <select name="aluno_id" required>
+      <option value="">Escolha o aluno...</option>
+      {% for a in alunos %}
+        <option value="{{ a.id }}">{{ a.nome }}{% if a.id in ids_presentes %} — já fez check-in hoje ✓{% endif %}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-success">✅ REGISTRAR CHECK-IN</button>
+  </form>
+
+  <div class="section-title">Presenças de hoje ({{ presentes_hoje|length }})</div>
+  {% if presentes_hoje %}
+    {% for c in presentes_hoje %}
+      <div class="item-lista-card">
+        <div>
+          <div class="titulo">{{ c.aluno_nome }}</div>
+          <div class="sub">Check-in às {{ c.data_hora[11:16] }}</div>
+        </div>
+        <form method="post" action="{{ url_for('checkin_excluir', checkin_id=c.id) }}"
+              onsubmit="return confirm('Remover este check-in?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-icon-excluir" title="Remover">🗑️</button>
+        </form>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state"><div class="empty-ic">✅</div><p>Nenhum check-in registrado hoje ainda.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

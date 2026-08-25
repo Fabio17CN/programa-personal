@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Recuperar senha{% endblock %}
+{% block content %}
+<div class="center-screen login-bg">
+  <div class="login-glow"></div>
+  <div class="card login-card card-vidro" style="max-width:420px;">
+    <h1 class="brand brand-elegant" style="text-align:center;">RECUPERAR ACESSO</h1>
+
+    {% if not etapa_nova_senha %}
+    <!-- ETAPA 1: usuário ou e-mail -->
+    <div id="etapa-usuario">
+      <p class="cadastro-passo-desc">Informe seu usuário ou e-mail cadastrado.</p>
+      <label>Usuário ou e-mail</label>
+      <input type="text" id="campo-usuario" autocomplete="username" required>
+      <p class="cadastro-erro" id="erro-usuario"></p>
+      <button type="button" class="btn btn-primary" id="btn-enviar-codigo">ENVIAR CÓDIGO →</button>
+    </div>
+
+    <!-- ETAPA 2: código -->
+    <div id="etapa-codigo" style="display:none;">
+      <p class="cadastro-passo-desc">
+        Digite o código de 6 dígitos enviado para <strong id="email-mascarado"></strong>.
+        Válido por 10 minutos, até 3 tentativas.
+      </p>
+      <label>Código de verificação</label>
+      <input type="text" id="campo-codigo" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+      <p class="cadastro-erro" id="erro-codigo"></p>
+      <button type="button" class="btn btn-primary" id="btn-confirmar-codigo">CONFIRMAR CÓDIGO →</button>
+      <button type="button" class="btn btn-link" id="btn-reenviar-codigo">reenviar código</button>
+    </div>
+    {% endif %}
+
+    <!-- ETAPA 3: nova senha -->
+    <div id="etapa-nova-senha" style="{{ '' if etapa_nova_senha else 'display:none;' }}">
+      <form method="post" action="{{ url_for('recuperar_senha_finalizar') }}" id="form-nova-senha" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>Nova senha</label>
+        <input type="password" name="senha1" id="campo-nova-senha1" autocomplete="new-password" required>
+        <label>Confirmar nova senha</label>
+        <input type="password" name="senha2" id="campo-nova-senha2" autocomplete="new-password" required>
+        <p style="color:var(--subtext);font-size:12px;margin-top:-10px;">
+          Mínimo 8 caracteres, com letra maiúscula, minúscula e número.
+        </p>
+        <p class="cadastro-erro" id="erro-nova-senha"></p>
+        <button type="submit" class="btn btn-success" id="btn-salvar-senha" disabled>SALVAR NOVA SENHA</button>
+      </form>
+    </div>
+
+    <a href="{{ url_for('login') }}" class="btn btn-link">Voltar</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .cadastro-passo-desc { color: var(--subtext); font-size: 13px; line-height: 1.5; margin-bottom: 14px; }
+  .cadastro-erro { color: #e05252; font-size: 12.5px; min-height: 16px; margin: -6px 0 8px; }
+</style>
+<script>
+(function () {
+  var csrf = "{{ csrf_token() }}";
+  var usuarioAtual = "";
+
+  var etapaUsuario = document.getElementById('etapa-usuario');
+  var etapaCodigo = document.getElementById('etapa-codigo');
+  var etapaNovaSenha = document.getElementById('etapa-nova-senha');
+
+  function post(url, dados) {
+    var form = new FormData();
+    form.append('csrf_token', csrf);
+    for (var chave in dados) form.append(chave, dados[chave]);
+    return fetch(url, { method: 'POST', body: form }).then(function (r) {
+      return r.json().then(function (json) { return { status: r.status, json: json }; });
+    });
+  }
+
+  if (document.getElementById('btn-enviar-codigo')) {
+    document.getElementById('btn-enviar-codigo').addEventListener('click', function () {
+      var usuario = document.getElementById('campo-usuario').value.trim();
+      document.getElementById('erro-usuario').textContent = '';
+      post("{{ url_for('recuperar_senha_enviar_codigo') }}", { usuario: usuario }).then(function (res) {
+        if (!res.json.ok) {
+          document.getElementById('erro-usuario').textContent = res.json.erro;
+          return;
+        }
+        usuarioAtual = usuario;
+        document.getElementById('email-mascarado').textContent = res.json.email_mascarado;
+        etapaUsuario.style.display = 'none';
+        etapaCodigo.style.display = 'block';
+      });
+    });
+  }
+
+  if (document.getElementById('btn-reenviar-codigo')) {
+    document.getElementById('btn-reenviar-codigo').addEventListener('click', function () {
+      post("{{ url_for('recuperar_senha_enviar_codigo') }}", { usuario: usuarioAtual }).then(function (res) {
+        document.getElementById('erro-codigo').textContent = res.json.ok
+          ? 'Código reenviado!' : res.json.erro;
+      });
+    });
+  }
+
+  if (document.getElementById('btn-confirmar-codigo')) {
+    document.getElementById('btn-confirmar-codigo').addEventListener('click', function () {
+      var codigo = document.getElementById('campo-codigo').value.trim();
+      document.getElementById('erro-codigo').textContent = '';
+      post("{{ url_for('recuperar_senha_verificar_codigo') }}", { codigo: codigo }).then(function (res) {
+        if (!res.json.ok) {
+          document.getElementById('erro-codigo').textContent = res.json.erro;
+          return;
+        }
+        etapaCodigo.style.display = 'none';
+        etapaNovaSenha.style.display = 'block';
+      });
+    });
+  }
+
+  // --- Etapa de nova senha: validação em tempo real ---
+  var campoSenha1 = document.getElementById('campo-nova-senha1');
+  var campoSenha2 = document.getElementById('campo-nova-senha2');
+  var btnSalvarSenha = document.getElementById('btn-salvar-senha');
+  var erroNovaSenha = document.getElementById('erro-nova-senha');
+  var formNovaSenha = document.getElementById('form-nova-senha');
+
+  function senhaForte(s) {
+    return s.length >= 8 && /[A-Z]/.test(s) && /[a-z]/.test(s) && /[0-9]/.test(s);
+  }
+
+  var avisouDivergencia = false;
+
+  function validarNovaSenha() {
+    var senhaOk = senhaForte(campoSenha1.value);
+    var confirmaOk = campoSenha2.value.length > 0 && campoSenha1.value === campoSenha2.value;
+
+    if (campoSenha2.value.length > 0 && campoSenha1.value !== campoSenha2.value) {
+      erroNovaSenha.textContent = 'As senhas não coincidem.';
+      if (!avisouDivergencia) {
+        window.mostrarToast('As senhas não coincidem.', 'warning');
+        avisouDivergencia = true;
+      }
+    } else {
+      erroNovaSenha.textContent = '';
+      avisouDivergencia = false;
+    }
+
+    var tudoOk = senhaOk && confirmaOk;
+    btnSalvarSenha.disabled = !tudoOk;
+    return tudoOk;
+  }
+
+  if (formNovaSenha) {
+    [campoSenha1, campoSenha2].forEach(function (campo) {
+      campo.addEventListener('input', validarNovaSenha);
+    });
+    validarNovaSenha();
+
+    formNovaSenha.addEventListener('submit', function (e) {
+      if (!validarNovaSenha()) {
+        e.preventDefault();
+        if (!senhaForte(campoSenha1.value)) {
+          window.mostrarToast('A senha precisa ter 8+ caracteres, maiúscula, minúscula e número.', 'warning');
+        }
+        return;
+      }
+      btnSalvarSenha.disabled = true;
+      btnSalvarSenha.textContent = 'SALVANDO...';
+    });
+  }
+})();
+</script>
+{% endblock %}

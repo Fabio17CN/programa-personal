@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Resultado — {{ aluno.nome }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="topbar-com-voltar">
+    <a href="{{ url_for('aluno_perfil', aluno_id=aluno.id) }}" class="topbar-voltar" title="Voltar">{{ svg('seta-esquerda') }}</a>
+    <h2>Resultado — {{ aluno.nome }}</h2>
+  </div>
+
+  <div class="aviso-status aviso-status-ok">
+    ✅ Enviada automaticamente — já está disponível em "Minha Avaliação" no app do {{ aluno.nome.split(' ')[0] }}.
+  </div>
+
+  <div class="row">
+    <div class="gauge-card">
+      {% set r = 46 %}
+      {% set circ = 2 * 3.14159 * r %}
+      <svg viewBox="0 0 120 120" class="gauge-svg">
+        <circle cx="60" cy="60" r="{{ r }}" fill="none" stroke="#17130D" stroke-width="10" />
+        <circle cx="60" cy="60" r="{{ r }}" fill="none" stroke="{{ gauge_imc.cor }}" stroke-width="10"
+                stroke-linecap="round" transform="rotate(-90 60 60)"
+                stroke-dasharray="{{ circ }}" stroke-dashoffset="{{ circ * (1 - gauge_imc.pct/100) }}" />
+      </svg>
+      <div class="gauge-center">
+        <div class="gauge-valor">{{ avaliacao.imc or '-' }}</div>
+        <div class="gauge-rotulo">IMC</div>
+      </div>
+      {% if cat_imc %}<div class="classificacao" style="background:{{ gauge_imc.cor }}22;color:{{ gauge_imc.cor }};">{{ cat_imc }}</div>{% endif %}
+    </div>
+
+    <div class="gauge-card">
+      {% set r = 46 %}
+      {% set circ = 2 * 3.14159 * r %}
+      <svg viewBox="0 0 120 120" class="gauge-svg">
+        <circle cx="60" cy="60" r="{{ r }}" fill="none" stroke="#17130D" stroke-width="10" />
+        <circle cx="60" cy="60" r="{{ r }}" fill="none" stroke="{{ gauge_bf.cor }}" stroke-width="10"
+                stroke-linecap="round" transform="rotate(-90 60 60)"
+                stroke-dasharray="{{ circ }}" stroke-dashoffset="{{ circ * (1 - gauge_bf.pct/100) }}" />
+      </svg>
+      <div class="gauge-center">
+        <div class="gauge-valor">{{ avaliacao.bf or '-' }}%</div>
+        <div class="gauge-rotulo">GORDURA</div>
+      </div>
+      {% if cat_bf %}<div class="classificacao" style="background:{{ gauge_bf.cor }}22;color:{{ gauge_bf.cor }};">{{ cat_bf }}</div>{% endif %}
+    </div>
+  </div>
+
+  {% if indicadores_extra %}
+  <div class="section-title">Painel profissional</div>
+  <div class="card calc-automatico" style="max-width:none;">
+    <div class="grid-calc">
+      {% if indicadores_extra.rcq %}
+      <div class="calc-box">
+        <div class="calc-valor">{{ indicadores_extra.rcq }}</div>
+        <div class="calc-rotulo">RCQ</div>
+        {% if indicadores_extra.cat_rcq %}<div class="calc-classe">{{ indicadores_extra.cat_rcq }}</div>{% endif %}
+      </div>
+      {% endif %}
+      {% if indicadores_extra.rcest %}
+      <div class="calc-box">
+        <div class="calc-valor">{{ indicadores_extra.rcest }}</div>
+        <div class="calc-rotulo">RCEst</div>
+        {% if indicadores_extra.cat_rcest %}<div class="calc-classe">{{ indicadores_extra.cat_rcest }}</div>{% endif %}
+      </div>
+      {% endif %}
+      {% if indicadores_extra.ic %}
+      <div class="calc-box">
+        <div class="calc-valor">{{ indicadores_extra.ic }}</div>
+        <div class="calc-rotulo">Índice de Conicidade</div>
+        {% if indicadores_extra.cat_ic %}<div class="calc-classe">{{ indicadores_extra.cat_ic }}</div>{% endif %}
+      </div>
+      {% endif %}
+      {% if indicadores_extra.tmb %}
+      <div class="calc-box">
+        <div class="calc-valor">{{ indicadores_extra.tmb }}</div>
+        <div class="calc-rotulo">TMB (kcal/dia)</div>
+      </div>
+      {% endif %}
+      {% if indicadores_extra.peso_ideal %}
+      <div class="calc-box">
+        <div class="calc-valor">{{ indicadores_extra.peso_ideal }}kg</div>
+        <div class="calc-rotulo">Peso de referência</div>
+        {% if indicadores_extra.peso_ideal_detalhe %}
+        <div class="calc-classe">Faixa saudável: {{ indicadores_extra.peso_ideal_detalhe.faixa_min }}–{{ indicadores_extra.peso_ideal_detalhe.faixa_max }}kg</div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+    <p style="color:var(--subtext);font-size:11.5px;margin:8px 0 0;">
+      RCQ = relação cintura-quadril · RCEst = relação cintura-estatura · Índice de Conicidade complementa a
+      leitura de distribuição de gordura · TMB = taxa metabólica basal (Mifflin-St Jeor) · peso de referência
+      é a média de 5 fórmulas clássicas (Lorentz, Devine, Robinson, Miller e Hamwi — cada uma com coeficientes
+      próprios para homens e mulheres), e a faixa saudável usa o IMC de 18,5 a 24,9. Não são metas rígidas.
+    </p>
+  </div>
+  {% endif %}
+
+  <div class="card" style="max-width:none;text-align:center;">
+    <h3 style="margin-top:0;color:var(--primary);">Avaliação Postural (opcional)</h3>
+    <p style="color:var(--subtext);font-size:13.5px;">
+      Quer aproveitar e já fazer a avaliação postural com a câmera do celular?
+      É opcional — se preferir, pule direto para o resultado final em PDF.
+    </p>
+    <a href="{{ url_for('postural_tela', aluno_id=aluno.id, avaliacao_id=avaliacao.id) }}" class="btn btn-primary">📷 SIM, FAZER AVALIAÇÃO POSTURAL</a>
+    <a href="{{ url_for('avaliacao_pdf', aluno_id=aluno.id, avaliacao_id=avaliacao.id) }}" class="btn btn-outline">PULAR E VER RESULTADO FINAL (PDF)</a>
+  </div>
+
+  <a href="{{ url_for('aluno_perfil', aluno_id=aluno.id) }}" class="btn btn-link">Voltar para o perfil do aluno</a>
+</div>
+{% endblock %}

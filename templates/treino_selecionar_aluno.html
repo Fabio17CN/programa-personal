@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% from "_icons.html" import svg %}
+{% block title %}Montar ficha de treino{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="page-hero">
+    <div class="page-hero-row">
+      <a href="{{ url_for('dashboard') }}" class="page-hero-voltar" title="Voltar ao painel">{{ svg('seta-esquerda') }}</a>
+      <div class="page-hero-ic">🏋️</div>
+      <div>
+        <h2>Montar ficha de treino</h2>
+        <p>Escolha o aluno pra montar ou continuar a ficha dele.</p>
+      </div>
+    </div>
+  </div>
+
+  <form method="get" class="search-bar">
+    <input type="text" name="q" value="{{ termo }}" placeholder="🔎 Buscar aluno por nome" autofocus>
+    <button type="submit" class="btn btn-primary" style="width:auto;margin:0;padding:12px 16px;">Buscar</button>
+  </form>
+
+  <div class="section-title">{{ alunos|length }} aluno{{ 's' if alunos|length != 1 else '' }} {% if termo %}encontrado(s){% else %}cadastrado(s){% endif %}</div>
+  {% if alunos %}
+    {% for a in alunos %}
+      {% set resumo = resumo_treinos.get(a.id) %}
+      <div class="card card-aluno-treino" style="max-width:none;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+          <div style="min-width:0;">
+            <div class="nome" style="font-weight:800;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ a.nome }}</div>
+            <div class="sub" style="color:var(--subtext);font-size:12px;margin-top:2px;">{{ a.academia or 'Sem academia definida' }}{% if a.objetivo %} · {{ a.objetivo }}{% endif %}</div>
+          </div>
+          {% if resumo %}
+            <span class="badge-ficha-ok" title="Já tem ficha de treino">✓ {{ resumo.total }} ficha{{ 's' if resumo.total != 1 else '' }}</span>
+          {% else %}
+            <span class="badge-ficha-vazia" title="Ainda não tem ficha">Sem ficha</span>
+          {% endif %}
+        </div>
+
+        {% if resumo %}
+          <div style="color:var(--subtext);font-size:12px;margin-top:8px;">
+            Última ficha: <strong style="color:var(--text);">{{ resumo.ultimo_nome or 'Ficha de treino' }}</strong> · {{ (resumo.ultima_data or '')[:10] }}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <a href="{{ url_for('treino_editar', aluno_id=a.id, treino_id=resumo.ultimo_id) }}" class="btn btn-primary btn-sm" style="flex:1;margin:0;text-align:center;text-decoration:none;">✏️ Editar ficha atual</a>
+            <a href="{{ url_for('treino_novo', aluno_id=a.id) }}" class="btn btn-outline btn-sm" style="flex:1;margin:0;text-align:center;text-decoration:none;">+ Nova ficha</a>
+          </div>
+          {% if resumo.total > 1 %}
+            <a href="{{ url_for('treinos_registrados') }}" style="display:inline-block;margin-top:8px;font-size:11.5px;color:var(--primary);text-decoration:none;">Ver todas as fichas deste aluno →</a>
+          {% endif %}
+        {% else %}
+          <a href="{{ url_for('treino_novo', aluno_id=a.id) }}" class="btn btn-success btn-sm" style="width:100%;margin-top:10px;text-decoration:none;display:block;text-align:center;">📝 Montar primeira ficha</a>
+        {% endif %}
+      </div>
+    {% endfor %}
+  {% else %}
+    <p style="color:var(--subtext);font-size:13px;">
+      Nenhum aluno {% if termo %}encontrado{% else %}cadastrado ainda{% endif %}.
+      {% if not termo %}<a href="{{ url_for('aluno_novo') }}" class="btn-link">Cadastrar o primeiro aluno</a>{% endif %}
+    </p>
+  {% endif %}
+</div>
+
+<style>
+.card-aluno-treino { padding: 14px 16px; }
+.badge-ficha-ok {
+  flex: 0 0 auto; font-size: 10.5px; font-weight: 700; white-space: nowrap;
+  color: var(--success); background: rgba(16,185,129,0.12);
+  border: 1px solid rgba(16,185,129,0.3); border-radius: 20px; padding: 4px 10px;
+}
+.badge-ficha-vazia {
+  flex: 0 0 auto; font-size: 10.5px; font-weight: 700; white-space: nowrap;
+  color: var(--subtext); background: var(--card-2);
+  border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px;
+}
+</style>
+{% endblock %}
